@@ -337,7 +337,7 @@ function renderUpfile(
 }
 
 /** ページ全体で貼り付け(Ctrl+V)を捕まえる */
-export function listenPaste(dispatch: Dispatch<Blob>): () => void {
+function listenPaste(dispatch: Dispatch<Blob>): () => void {
     const abort = new AbortController()
     document.addEventListener(
         "paste",
@@ -366,7 +366,7 @@ export function listenPaste(dispatch: Dispatch<Blob>): () => void {
  * @param fileInput 画像を設定するファイル選択欄
  * @param image 設定する画像データ
  */
-export function setImage(
+function setImage(
     tool: string,
     fileInput: HTMLInputElement | null,
     image: Blob,
@@ -386,7 +386,7 @@ export function setImage(
 }
 
 /** 貼付ボタンを押したとき使う。クリップボードから画像を読み出す */
-export async function pasteFromClipboard(
+async function pasteFromClipboard(
     clipboard: Clipboard,
 ): Promise<Blob | undefined> {
     try {
@@ -414,7 +414,7 @@ export async function pasteFromClipboard(
  * @param tryRead MIMEタイプの画像を読み出そうとする関数(失敗したらfalsyな値を返す)
  * @return 見つかった画像データ、なければundefined
  */
-export function findImage<T>(
+function findImage<T>(
     items: Iterable<T>,
     tryRead: (item: T, type: string) => Blob | Promise<Blob> | null | false,
 ): Blob | Promise<Blob> | undefined {
@@ -455,7 +455,7 @@ function revokePreviousObjectUrl(preview: HTMLElement): void {
  * @param input ファイル選択欄
  * @param preview プレビューを差し込む要素
  */
-export function previewFile(
+function previewFile(
     input: HTMLInputElement | null,
     preview: HTMLElement | null,
 ): void {
@@ -521,12 +521,9 @@ export function previewFile(
     preview.appendChild(info)
 }
 
-export function welcomeHacchan(
+function welcomeHacchan(
     canvas: HTMLCanvasElement | null,
-    {
-        canvasWidth,
-        canvasHeight,
-    }: { canvasWidth: number; canvasHeight: number },
+    { canvasWidth, canvasHeight }: UpfileInputProps,
 ): void {
     if (!canvas) {
         return
@@ -543,7 +540,7 @@ export function welcomeHacchan(
 }
 
 /** 投稿フォームが開閉したとき知らせる */
-export function listenPopupFormToggled(
+function listenPopupFormToggled(
     form: HTMLFormElement,
     setIsPopupFormCollapsed: Dispatch<boolean>,
 ): () => void {
@@ -557,7 +554,7 @@ export function listenPopupFormToggled(
 }
 
 /** webpで画像の再圧縮を試みる。小さくならなければ元の画像を返す */
-export async function tryReencodeWebp(imageBlob: Blob): Promise<Blob> {
+async function tryReencodeWebp(imageBlob: Blob): Promise<Blob> {
     if (imageBlob.type === "image/webp") {
         return imageBlob
     }
