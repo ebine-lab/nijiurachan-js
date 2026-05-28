@@ -8,7 +8,7 @@
 > 本文書はそれらを束ねる入口・概念整理。
 >
 > 「なぜ preact/compat ではなくこのアプローチを選んだのか」「将来どんな状況になったら別案を検討すべきか」の
-> **設計判断の根拠**は [`docs/specs/MEMO_REACT_BRIDGE_DECISION.md`](../specs/MEMO_REACT_BRIDGE_DECISION.md) を参照する。
+> **設計判断の根拠**は [`docs/specs/03_Reactブリッジ設計メモ.md`](../specs/03_Reactブリッジ設計メモ.md) を参照する。
 
 ## 1. なぜラッパーが必要か
 
@@ -263,7 +263,7 @@ interface LatestEventDetailProvider {
 | --- | --- |
 | 各 API のシグネチャ / 戻り値型 / 遅延リスナの内部 | [`src/react/PreactWrapperV1/README.md`](../../src/react/PreactWrapperV1/README.md) |
 | upfile-input v1 / v2 の違い | [`src/elements/upfile-input.ts`](../../src/elements/upfile-input.ts) と [`src/elements/upfile-input-v2.ts`](../../src/elements/upfile-input-v2.ts) を読み比べる |
-| 共通基盤のどこに何を置くか (境界整理) | [`docs/specs/FOUNDATION_BOUNDARY_MATRIX.md`](../specs/FOUNDATION_BOUNDARY_MATRIX.md) |
+| 共通基盤のどこに何を置くか (境界整理) | [`docs/specs/02_共通基盤境界マトリクス.md`](../specs/02_共通基盤境界マトリクス.md) |
 | イベント契約 (`aimg:*`) | [`src/components/types.ts`](../../src/components/types.ts) |
 | upfile の状態遷移ロジック | [`src/pure/upfile.ts`](../../src/pure/upfile.ts) |
 | `bun link` で symlink 利用するときの注意 | [`src/react/PreactWrapperV1/README.md` §インストール](../../src/react/PreactWrapperV1/README.md) |

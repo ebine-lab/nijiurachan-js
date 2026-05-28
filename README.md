@@ -7,10 +7,10 @@
 
 - docs入口: `docs/README.md`
 - Birdseye: `docs/BIRDSEYE.md`
-- 共通基盤要件: `docs/requirements/SHARED_UI_FOUNDATION_REQUIREMENTS.md`
-- Phase 1-4 アーキテクチャ方針: `docs/specs/ARCHITECTURE_PHASE1_TO_PHASE4.md`
-- Runbook: `docs/operations/RUNBOOK.md`
-- テスト設計メモ: `docs/implementation/TEST_DESIGN.md`
+- 共通基盤要件: `docs/requirements/01_共通UI基盤要件.md`
+- Phase 1-4 アーキテクチャ方針: `docs/specs/01_Phase1〜Phase4アーキテクチャ.md`
+- Runbook: `docs/operations/01_RUNBOOK.md`
+- テスト設計メモ: `docs/implementation/01_テスト設計.md`
 
 ## Contributing
 

@@ -57,7 +57,7 @@ flowchart LR
 - React アプリ向けの橋渡し入口 (`elements` の対 React 版)
 - generic 部 (`PreactWrapperV1/` 直下と `core/`) は要素のイベント名・属性・method を一切知らない
 - `elements` / `components` / `pure` 側に React 固有都合は持ち込まない (依存方向は react → elements/components/pure の片方向)
-- 設計判断の根拠は [`MEMO_REACT_BRIDGE_DECISION.md`](./MEMO_REACT_BRIDGE_DECISION.md) を参照
+- 設計判断の根拠は [`03_Reactブリッジ設計メモ.md`](./03_Reactブリッジ設計メモ.md) を参照
 
 ## 4. Phase 別の役割
 

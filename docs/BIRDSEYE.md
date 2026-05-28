@@ -61,14 +61,14 @@ flowchart LR
 | --- | --- |
 | `docs/README.md` | docs 入口、読み順 |
 | `docs/BIRDSEYE.md` | 俯瞰、ホットスポット |
-| `docs/requirements/SHARED_UI_FOUNDATION_REQUIREMENTS.md` | 共通基盤の要件 |
-| `docs/specs/ARCHITECTURE_PHASE1_TO_PHASE4.md` | Phase 1 / 3 / 4 を受ける設計方針 |
-| `docs/specs/FOUNDATION_BOUNDARY_MATRIX.md` | 共通基盤に残す責務と外へ出す責務の整理 |
-| `docs/specs/MEMO_REACT_BRIDGE_DECISION.md` | PreactWrapperV1 設計時、ラッパーという形式を選んだことについての考察 |
-| `docs/operations/IMPLEMENTATION_BOTTLENECK_REVIEW.md` | 共通基盤として崩れやすい箇所のレビュー |
-| `docs/implementation/TEST_DESIGN.md` | 確認観点 |
-| `docs/implementation/REACT_BRIDGE_PREACT_WRAPPER_V1.md` | React 側橋渡し `PreactWrapperV1` の説明書 |
-| `docs/operations/RUNBOOK.md` | 更新時、公開時、利用時の運用判断 |
+| `docs/requirements/01_共通UI基盤要件.md` | 共通基盤の要件 |
+| `docs/specs/01_Phase1〜Phase4アーキテクチャ.md` | Phase 1 / 3 / 4 を受ける設計方針 |
+| `docs/specs/02_共通基盤境界マトリクス.md` | 共通基盤に残す責務と外へ出す責務の整理 |
+| `docs/specs/03_Reactブリッジ設計メモ.md` | PreactWrapperV1 設計時、ラッパーという形式を選んだことについての考察 |
+| `docs/operations/02_実装ボトルネックレビュー.md` | 共通基盤として崩れやすい箇所のレビュー |
+| `docs/implementation/01_テスト設計.md` | 確認観点 |
+| `docs/implementation/02_ReactブリッジPreactWrapperV1.md` | React 側橋渡し `PreactWrapperV1` の説明書 |
+| `docs/operations/01_RUNBOOK.md` | 更新時、公開時、利用時の運用判断 |
 
 ## 6. 次に固めるべきもの
 

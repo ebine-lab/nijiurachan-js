@@ -5,7 +5,7 @@ React/TS クライアントから、`nijiurachan-js` の Custom Element (Preact 
 本バージョンは「要素非依存の generic API」に限定する。特定要素 (upfile-input 等) 向けの型付き sugar は各アプリでこのブリッジを利用して定義する。
 
 > 全体像 (背景・利用法) は
-> [`docs/implementation/REACT_BRIDGE_PREACT_WRAPPER_V1.md`](../../../docs/implementation/REACT_BRIDGE_PREACT_WRAPPER_V1.md) を参照。
+> [`docs/implementation/02_ReactブリッジPreactWrapperV1.md`](../../../docs/implementation/02_ReactブリッジPreactWrapperV1.md) を参照。
 > 本ファイルは API 詳細リファレンスの正本として残す。
 
 ## 責務
@@ -280,4 +280,4 @@ function SubmitButton() {
 - `src/elements/*` — ラップ対象の Custom Element 群
 - `src/components/types.ts` — `aimg:*` CustomEvent 契約 (`GlobalEventHandlersEventMap` 拡張)
 - `src/pure/upfile.ts` — upfile 関連の純粋ロジック (state flags 等)
-- [`docs/specs/MEMO_REACT_BRIDGE_DECISION.md`](../../../docs/specs/MEMO_REACT_BRIDGE_DECISION.md) — PreactWrapperV1 設計時、ラッパーという形式を選んだことについての考察
+- [`docs/specs/03_Reactブリッジ設計メモ.md`](../../../docs/specs/03_Reactブリッジ設計メモ.md) — PreactWrapperV1 設計時、ラッパーという形式を選んだことについての考察

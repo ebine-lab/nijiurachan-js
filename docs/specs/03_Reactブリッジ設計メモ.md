@@ -17,9 +17,9 @@ PreactWrapperV1 設計時、ラッパーという形式を選んだことにつ�
 そこで、本MEMOでは今後の改良を目指す方向けに、**(a)** 現行は妥当解か、**(b)** 将来どんな状況になったら別案へ移行すべきかを記録する。
 
 関連既存ドキュメント:
-- [`docs/implementation/REACT_BRIDGE_PREACT_WRAPPER_V1.md`](../implementation/REACT_BRIDGE_PREACT_WRAPPER_V1.md) — 説明書
-- [`docs/specs/ARCHITECTURE_PHASE1_TO_PHASE4.md`](./ARCHITECTURE_PHASE1_TO_PHASE4.md) — Phase 別アーキ方針
-- [`docs/specs/FOUNDATION_BOUNDARY_MATRIX.md`](./FOUNDATION_BOUNDARY_MATRIX.md) — 共通基盤の境界
+- [`docs/implementation/02_ReactブリッジPreactWrapperV1.md`](../implementation/02_ReactブリッジPreactWrapperV1.md) — 説明書
+- [`docs/specs/01_Phase1〜Phase4アーキテクチャ.md`](./01_Phase1〜Phase4アーキテクチャ.md) — Phase 別アーキ方針
+- [`docs/specs/02_共通基盤境界マトリクス.md`](./02_共通基盤境界マトリクス.md) — 共通基盤の境界
 - [`src/react/PreactWrapperV1/README.md`](../../src/react/PreactWrapperV1/README.md) — API リファレンス
 
 ---
@@ -126,7 +126,7 @@ PreactWrapperV1 は「正解」ではなく「**現条件下での Pareto 最適
 - 破壊変更が必要になったら `PreactWrapperV2/` を新設して並走する運用が必要
 
 ### Mitigations
-- 学習コストは [`src/react/PreactWrapperV1/README.md`](../../src/react/PreactWrapperV1/README.md) と [`docs/implementation/REACT_BRIDGE_PREACT_WRAPPER_V1.md`](../implementation/REACT_BRIDGE_PREACT_WRAPPER_V1.md) でカバー
+- 学習コストは [`src/react/PreactWrapperV1/README.md`](../../src/react/PreactWrapperV1/README.md) と [`docs/implementation/02_ReactブリッジPreactWrapperV1.md`](../implementation/02_ReactブリッジPreactWrapperV1.md) でカバー
 - DevTools 不可視性は `data-preact-wrapper-v1-key` 属性で要素を識別できるようにしてある
 
 ---
@@ -134,10 +134,10 @@ PreactWrapperV1 は「正解」ではなく「**現条件下での Pareto 最適
 ## 付録: クリティカルファイル
 
 - `src/react/PreactWrapperV1/README.md`
-- `docs/implementation/REACT_BRIDGE_PREACT_WRAPPER_V1.md`
+- `docs/implementation/02_ReactブリッジPreactWrapperV1.md`
 - `src/pure/upfile.ts` (はっちゃん拡張の挙動説明)
 - `src/elements/upfile-input-v2.ts` (formAssociated 実例)
 - `src/components/upfile-input-fragment-v2.tsx` (canvas oejs 取り扱い)
 - `package.json` (peerDependencies の構造)
-- `docs/specs/ARCHITECTURE_PHASE1_TO_PHASE4.md`
-- `docs/specs/FOUNDATION_BOUNDARY_MATRIX.md`
+- `docs/specs/01_Phase1〜Phase4アーキテクチャ.md`
+- `docs/specs/02_共通基盤境界マトリクス.md`
