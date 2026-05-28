@@ -24,7 +24,7 @@
 
 - Turnstile / 添付入力 / paint 連携の共通契約
 - どこまでを共通基盤へ寄せ、どこからをアプリ側に残すかの運用線
-- 直近レビューは `docs/operations/IMPLEMENTATION_BOTTLENECK_REVIEW.md` を参照する
+- 直近レビューは `docs/operations/02_実装ボトルネックレビュー.md` を参照する
 
 ## 5. 更新ルール
 
