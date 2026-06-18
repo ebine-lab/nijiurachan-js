@@ -190,8 +190,9 @@ describe("bouyomi-connector 読み上げ方式", () => {
         await flushMicrotasks()
 
         const u = firstUtterance()
-        expect(u.rate).toBeLessThanOrEqual(2)
-        expect(u.volume).toBeLessThanOrEqual(1)
+        // 上限超過は上限値ちょうどに丸められる（RATE_MAX=2 / 音量上限=1）
+        expect(u.rate).toBe(2)
+        expect(u.volume).toBe(1)
     })
 
     test("disconnect 時に進行中の読み上げを cancel する", async () => {
@@ -203,6 +204,25 @@ describe("bouyomi-connector 読み上げ方式", () => {
         addReply("r1", "中断")
         await flushMicrotasks()
         el.remove()
+
+        expect(cancelSpy).toHaveBeenCalled()
+    })
+
+    test("方式切替時に進行中の読み上げを cancel する", async () => {
+        await mountInitialized({
+            alwaysEnabled: true,
+            mode: "browser",
+        })
+
+        const select = document.querySelector<HTMLSelectElement>(
+            "[data-bouyomi-mode]",
+        )
+        if (!select) throw new Error("mode select missing")
+
+        // 切替操作そのものによる cancel だけを測る
+        cancelSpy.mockClear()
+        select.value = "bouyomi"
+        select.dispatchEvent(new Event("change"))
 
         expect(cancelSpy).toHaveBeenCalled()
     })
