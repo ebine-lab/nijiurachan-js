@@ -5,6 +5,9 @@
 // @license      MIT
 */
 
+/** 読み上げ方式 */
+type SpeechMode = "bouyomi" | "browser"
+
 /**
  * 棒読みちゃん連携設定
  */
@@ -17,6 +20,12 @@ interface BouyomiSettings {
     endpoint: string
     /** 個別ONにしたスレッドID一覧 */
     enabledThreadIds: string[]
+    /** 読み上げ方式（bouyomi=棒読みちゃん連携 / browser=ブラウザ内蔵） */
+    mode: SpeechMode
+    /** ブラウザ内蔵読み上げの速度（RATE_MIN〜RATE_MAX） */
+    rate: number
+    /** ブラウザ内蔵読み上げの音量（0〜1） */
+    volume: number
 }
 
 const STORAGE_KEY = "bouyomiSettings"
@@ -24,6 +33,17 @@ const DEFAULT_ENDPOINT = "http://localhost:50080/Talk"
 const INIT_COOLDOWN_MS = 3000
 const QUEUE_INTERVAL_MS = 500
 const MAX_TEXT_LENGTH = 200
+
+/** ブラウザ内蔵読み上げの言語 */
+const SPEECH_LANG = "ja-JP"
+const DEFAULT_RATE = 1
+const DEFAULT_VOLUME = 1
+const RATE_MIN = 0.5
+const RATE_MAX = 2
+/** onend が来ない環境向けフォールバックの1文字あたり見積もり時間 */
+const SPEECH_MS_PER_CHAR = 200
+/** 同上、見積もりに足す余裕（ms） */
+const SPEECH_SAFETY_MARGIN_MS = 2000
 
 /**
  * 棒読みちゃん連携カスタム要素
@@ -51,6 +71,9 @@ export class BouyomiConnectorElement extends HTMLElement {
         autoScroll: false,
         endpoint: DEFAULT_ENDPOINT,
         enabledThreadIds: [],
+        mode: "bouyomi",
+        rate: DEFAULT_RATE,
+        volume: DEFAULT_VOLUME,
     }
 
     /** UIパネル要素 */
@@ -109,6 +132,9 @@ export class BouyomiConnectorElement extends HTMLElement {
             clearTimeout(this.#queueTimer)
             this.#queueTimer = null
         }
+        // 進行中・予約済みのブラウザ読み上げを止める
+        this.#cancelSpeech()
+        this.#queue = []
         this.#isInitialized = false
         this.#isProcessing = false
     }
@@ -124,6 +150,16 @@ export class BouyomiConnectorElement extends HTMLElement {
                     autoScroll: parsed.autoScroll ?? false,
                     endpoint: parsed.endpoint ?? DEFAULT_ENDPOINT,
                     enabledThreadIds: parsed.enabledThreadIds ?? [],
+                    // 旧設定（mode 無し）は棒読みちゃん連携として扱う
+                    mode: parsed.mode === "browser" ? "browser" : "bouyomi",
+                    rate:
+                        typeof parsed.rate === "number"
+                            ? parsed.rate
+                            : DEFAULT_RATE,
+                    volume:
+                        typeof parsed.volume === "number"
+                            ? parsed.volume
+                            : DEFAULT_VOLUME,
                 }
             }
         } catch {
@@ -272,13 +308,30 @@ export class BouyomiConnectorElement extends HTMLElement {
         const text = this.#queue.shift()
 
         if (text) {
-            this.#sendToBouyomi(text)
+            this.#speak(text, () => this.#advanceQueue())
+        } else {
+            this.#advanceQueue()
+        }
+    }
+
+    /** 1件の読み上げ完了後に次のキューへ進む */
+    #advanceQueue(): void {
+        this.#isProcessing = false
+        this.#processQueue()
+    }
+
+    /** 現在の方式で1件読み上げ、次へ進める準備ができたら done を呼ぶ */
+    #speak(text: string, done: () => void): void {
+        if (this.#settings.mode === "browser") {
+            this.#speakWithBrowser(text, done)
+            return
         }
 
+        this.#sendToBouyomi(text)
+        // 棒読みちゃんは送信のみで完了を取得できないため固定間隔で次へ
         this.#queueTimer = setTimeout(() => {
             this.#queueTimer = null
-            this.#isProcessing = false
-            this.#processQueue()
+            done()
         }, QUEUE_INTERVAL_MS)
     }
 
@@ -292,6 +345,67 @@ export class BouyomiConnectorElement extends HTMLElement {
             const img = new Image()
             img.src = url
         })
+    }
+
+    /** ブラウザ内蔵の音声合成（Web Speech API）で読み上げ */
+    #speakWithBrowser(text: string, done: () => void): void {
+        const synth = window.speechSynthesis
+        if (!synth || typeof SpeechSynthesisUtterance === "undefined") {
+            // 非対応環境では固定間隔で次へ送り、停止しないようにする
+            this.#queueTimer = setTimeout(() => {
+                this.#queueTimer = null
+                done()
+            }, QUEUE_INTERVAL_MS)
+            return
+        }
+
+        const rate = this.#clampRate(this.#settings.rate)
+        const utterance = new SpeechSynthesisUtterance(text)
+        utterance.lang = SPEECH_LANG
+        utterance.rate = rate
+        utterance.volume = this.#clampVolume(this.#settings.volume)
+
+        // onend / onerror / セーフティタイマーのうち最初の1回だけ次へ進む
+        let advanced = false
+        const advance = (): void => {
+            if (advanced) return
+            advanced = true
+            if (this.#queueTimer !== null) {
+                clearTimeout(this.#queueTimer)
+                this.#queueTimer = null
+            }
+            done()
+        }
+        utterance.onend = advance
+        utterance.onerror = advance
+
+        // onend が発火しない環境向けに、文字数と速度から見積もったタイムアウトで保険
+        const estimatedMs =
+            (text.length * SPEECH_MS_PER_CHAR) / rate + SPEECH_SAFETY_MARGIN_MS
+        this.#queueTimer = setTimeout(advance, estimatedMs)
+
+        synth.speak(utterance)
+    }
+
+    /** 進行中・予約済みのブラウザ読み上げを止める */
+    #cancelSpeech(): void {
+        try {
+            window.speechSynthesis?.cancel()
+        } catch {
+            // 非対応環境は無視
+        }
+    }
+
+    /** 読み上げ速度を許容範囲にクランプ */
+    #clampRate(value: number): number {
+        if (Number.isNaN(value)) return DEFAULT_RATE
+        return Math.min(RATE_MAX, Math.max(RATE_MIN, value))
+    }
+
+    /** 読み上げ音量を 0〜1 にクランプ */
+    #clampVolume(value: number): number {
+        if (Number.isNaN(value)) return DEFAULT_VOLUME
+        return Math.min(1, Math.max(0, value))
     }
 
     /** 最下部にスクロール */
@@ -403,16 +517,79 @@ export class BouyomiConnectorElement extends HTMLElement {
             [autoScrollCheckbox, "自動スクロール"],
         )
 
+        // 読み上げ方式セレクト（棒読みちゃん / ブラウザ内蔵）
+        const modeSelect = this.#el(
+            "select",
+            {
+                "data-bouyomi-mode": "",
+                style: "width:100%;margin-top:4px;padding:4px;font-size:12px",
+            },
+            [
+                this.#el("option", { value: "bouyomi" }, ["棒読みちゃん"]),
+                this.#el("option", { value: "browser" }, [
+                    "ブラウザ内蔵（外部アプリ不要）",
+                ]),
+            ],
+        )
+        const modeLabel = this.#el(
+            "label",
+            { style: "display:block;margin-top:8px;font-size:12px" },
+            ["読み上げ方法", modeSelect],
+        )
+
+        // ブラウザ内蔵モードの速度スライダー
+        const rateInput = this.#el("input", {
+            type: "range",
+            min: String(RATE_MIN),
+            max: String(RATE_MAX),
+            step: "0.1",
+            "data-bouyomi-rate": "",
+            style: "width:100%",
+        })
+        const rateValue = this.#el("span", { "data-bouyomi-rate-value": "" })
+        const rateLabel = this.#el(
+            "label",
+            { style: "display:block;margin-top:6px;font-size:12px" },
+            ["速度 ", rateValue, rateInput],
+        )
+
+        // ブラウザ内蔵モードの音量スライダー
+        const volumeInput = this.#el("input", {
+            type: "range",
+            min: "0",
+            max: "1",
+            step: "0.1",
+            "data-bouyomi-volume": "",
+            style: "width:100%",
+        })
+        const volumeValue = this.#el("span", {
+            "data-bouyomi-volume-value": "",
+        })
+        const volumeLabel = this.#el(
+            "label",
+            { style: "display:block;margin-top:6px;font-size:12px" },
+            ["音量 ", volumeValue, volumeInput],
+        )
+
+        // ブラウザ内蔵モード専用設定（mode に応じて表示切替）
+        const browserSettings = this.#el(
+            "div",
+            { "data-bouyomi-browser-settings": "", style: "margin-top:4px" },
+            [rateLabel, volumeLabel],
+        )
+
         // コントロール群
         const controls = this.#el("div", { className: "bouyomi-controls" }, [
             toggleBtn,
             alwaysLabel,
             autoScrollLabel,
+            modeLabel,
+            browserSettings,
         ])
 
         // ヘッダー
         const header = this.#el("div", { className: "bouyomi-header" }, [
-            "棒読みちゃん連携",
+            "読み上げ設定",
         ])
 
         // パネル本体
@@ -465,9 +642,50 @@ export class BouyomiConnectorElement extends HTMLElement {
             this.#saveSettings()
         })
 
+        // 読み上げ方式セレクト
+        modeSelect.value = this.#settings.mode
+        modeSelect.addEventListener("change", () => {
+            this.#settings.mode =
+                modeSelect.value === "browser" ? "browser" : "bouyomi"
+            this.#saveSettings()
+            this.#updateBrowserSettingsVisibility()
+            // 方式切替時は進行中の読み上げを止める
+            this.#cancelSpeech()
+        })
+
+        // 速度スライダー
+        rateInput.value = String(this.#settings.rate)
+        rateValue.textContent = `${this.#settings.rate.toFixed(1)}x`
+        rateInput.addEventListener("input", () => {
+            const value = Number(rateInput.value)
+            this.#settings.rate = value
+            rateValue.textContent = `${value.toFixed(1)}x`
+            this.#saveSettings()
+        })
+
+        // 音量スライダー
+        volumeInput.value = String(this.#settings.volume)
+        volumeValue.textContent = `${Math.round(this.#settings.volume * 100)}%`
+        volumeInput.addEventListener("input", () => {
+            const value = Number(volumeInput.value)
+            this.#settings.volume = value
+            volumeValue.textContent = `${Math.round(value * 100)}%`
+            this.#saveSettings()
+        })
+
         document.body.appendChild(this.#panel)
 
-        // 初期状態のボタン表示を更新
+        // 初期状態の表示を更新
         this.#updateToggleButton()
+        this.#updateBrowserSettingsVisibility()
+    }
+
+    /** モードに応じてブラウザ内蔵設定（速度/音量）の表示を切り替える */
+    #updateBrowserSettingsVisibility(): void {
+        const box = this.#panel?.querySelector<HTMLElement>(
+            "[data-bouyomi-browser-settings]",
+        )
+        if (!box) return
+        box.style.display = this.#settings.mode === "browser" ? "block" : "none"
     }
 }

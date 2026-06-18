@@ -1,0 +1,209 @@
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
+import { BouyomiConnectorElement } from "#js/elements/bouyomi-connector"
+
+const INIT_COOLDOWN_MS = 3000
+const TAG = "bouyomi-connector-test"
+
+// jsdom は Web Speech API を実装しないため、最小限のモックを用意する。
+type MockUtterance = {
+    text: string
+    lang: string
+    rate: number
+    volume: number
+    onend: (() => void) | null
+    onerror: (() => void) | null
+}
+
+let spokenUtterances: MockUtterance[] = []
+let speakSpy: ReturnType<typeof vi.fn>
+let cancelSpy: ReturnType<typeof vi.fn>
+let fetchSpy: ReturnType<typeof vi.fn>
+
+// jsdom (このvitest設定) は localStorage を提供しないため、メモリ実装を入れる。
+function installLocalStorageMock(): void {
+    const store = new Map<string, string>()
+    const ls = {
+        getItem: (k: string): string | null =>
+            store.has(k) ? (store.get(k) ?? null) : null,
+        setItem: (k: string, v: string): void => {
+            store.set(k, String(v))
+        },
+        removeItem: (k: string): void => {
+            store.delete(k)
+        },
+        clear: (): void => {
+            store.clear()
+        },
+        key: (i: number): string | null => [...store.keys()][i] ?? null,
+        get length(): number {
+            return store.size
+        },
+    }
+    vi.stubGlobal("localStorage", ls)
+    Object.defineProperty(window, "localStorage", {
+        configurable: true,
+        value: ls,
+    })
+}
+
+function installSpeechMocks(): void {
+    class MockSpeechSynthesisUtterance {
+        text: string
+        lang = ""
+        rate = 1
+        volume = 1
+        onend: (() => void) | null = null
+        onerror: (() => void) | null = null
+        constructor(text: string) {
+            this.text = text
+        }
+    }
+    speakSpy = vi.fn((u: MockUtterance) => {
+        spokenUtterances.push(u)
+    })
+    cancelSpy = vi.fn()
+    vi.stubGlobal("SpeechSynthesisUtterance", MockSpeechSynthesisUtterance)
+    vi.stubGlobal("speechSynthesis", { speak: speakSpy, cancel: cancelSpy })
+    // window.speechSynthesis 経由のアクセスにも対応させる
+    Object.defineProperty(window, "speechSynthesis", {
+        configurable: true,
+        value: { speak: speakSpy, cancel: cancelSpy },
+    })
+}
+
+// jsdom の MutationObserver はマイクロタスクで発火するため、await で吐き出す。
+async function flushMicrotasks(): Promise<void> {
+    await Promise.resolve()
+    await Promise.resolve()
+}
+
+function addReply(replyId: string, text: string): void {
+    const container = document.querySelector("[data-thread-replies]")
+    if (!container) throw new Error("replies container missing")
+    const table = document.createElement("table")
+    table.setAttribute("data-reply-id", replyId)
+    const bq = document.createElement("blockquote")
+    bq.textContent = text
+    table.appendChild(bq)
+    container.appendChild(table)
+}
+
+function firstUtterance(): MockUtterance {
+    const u = spokenUtterances[0]
+    if (!u) throw new Error("no utterance spoken")
+    return u
+}
+
+async function mountInitialized(
+    settings: Record<string, unknown>,
+): Promise<HTMLElement> {
+    localStorage.setItem("bouyomiSettings", JSON.stringify(settings))
+    document.body.innerHTML = `<div data-thread-replies></div>`
+    const el = document.createElement(TAG)
+    el.setAttribute("data-thread-id", "t1")
+    document.body.appendChild(el)
+    // 初期ロードのクールタイムを消化して読み上げを有効化
+    vi.advanceTimersByTime(INIT_COOLDOWN_MS)
+    await flushMicrotasks()
+    return el
+}
+
+describe("bouyomi-connector 読み上げ方式", () => {
+    if (!customElements.get(TAG)) {
+        customElements.define(TAG, BouyomiConnectorElement)
+    }
+
+    beforeEach(() => {
+        vi.useFakeTimers()
+        spokenUtterances = []
+        installLocalStorageMock()
+        installSpeechMocks()
+        fetchSpy = vi.fn(() => Promise.resolve(new Response()))
+        vi.stubGlobal("fetch", fetchSpy)
+    })
+
+    afterEach(() => {
+        document.body.innerHTML = ""
+        vi.runOnlyPendingTimers()
+        vi.useRealTimers()
+        vi.unstubAllGlobals()
+    })
+
+    test("mode=browser のとき Web Speech API で読み上げる", async () => {
+        await mountInitialized({
+            alwaysEnabled: true,
+            mode: "browser",
+            rate: 1.2,
+            volume: 0.8,
+        })
+
+        addReply("r1", "こんにちは")
+        await flushMicrotasks()
+
+        expect(speakSpy).toHaveBeenCalledTimes(1)
+        const u = firstUtterance()
+        expect(u.text).toBe("こんにちは")
+        expect(u.lang).toBe("ja-JP")
+        expect(u.rate).toBe(1.2)
+        expect(u.volume).toBe(0.8)
+        // ブラウザ読み上げでは棒読みちゃんHTTPは叩かない
+        expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    test("mode=bouyomi のとき棒読みちゃんHTTPに送信し speak は呼ばない", async () => {
+        await mountInitialized({
+            alwaysEnabled: true,
+            mode: "bouyomi",
+        })
+
+        addReply("r1", "テスト")
+        await flushMicrotasks()
+
+        expect(fetchSpy).toHaveBeenCalledTimes(1)
+        const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "")
+        expect(calledUrl).toContain("localhost:50080/Talk")
+        expect(calledUrl).toContain(encodeURIComponent("テスト"))
+        expect(speakSpy).not.toHaveBeenCalled()
+    })
+
+    test("mode 未指定の既存設定は bouyomi として扱う(後方互換)", async () => {
+        await mountInitialized({
+            alwaysEnabled: true,
+        })
+
+        addReply("r1", "互換")
+        await flushMicrotasks()
+
+        expect(fetchSpy).toHaveBeenCalledTimes(1)
+        expect(speakSpy).not.toHaveBeenCalled()
+    })
+
+    test("browser モードで rate/volume が範囲外でもクランプされる", async () => {
+        await mountInitialized({
+            alwaysEnabled: true,
+            mode: "browser",
+            rate: 99,
+            volume: 5,
+        })
+
+        addReply("r1", "クランプ")
+        await flushMicrotasks()
+
+        const u = firstUtterance()
+        expect(u.rate).toBeLessThanOrEqual(2)
+        expect(u.volume).toBeLessThanOrEqual(1)
+    })
+
+    test("disconnect 時に進行中の読み上げを cancel する", async () => {
+        const el = await mountInitialized({
+            alwaysEnabled: true,
+            mode: "browser",
+        })
+
+        addReply("r1", "中断")
+        await flushMicrotasks()
+        el.remove()
+
+        expect(cancelSpy).toHaveBeenCalled()
+    })
+})
