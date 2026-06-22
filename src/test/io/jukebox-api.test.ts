@@ -1,0 +1,174 @@
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { createJukeboxClient } from "#js/io/jukebox-api";
+import type { JukeboxState } from "#js/pure/jukebox";
+
+const BASE = "https://music.nijiurachan.net";
+
+function mockFetch(body: unknown, status = 200): void {
+	vi.stubGlobal(
+		"fetch",
+		vi.fn().mockResolvedValue({
+			ok: status >= 200 && status < 300,
+			status,
+			json: () => Promise.resolve(body),
+		}),
+	);
+}
+
+afterEach(() => {
+	vi.unstubAllGlobals();
+});
+
+const exampleState: JukeboxState = {
+	nowPlaying: {
+		source: "youtube",
+		mediaId: "dQw4w9WgXcQ",
+		title: "Test Song",
+		durationSec: 212,
+		mine: false,
+		startedAtMs: 1_700_000_000_000 - 30_000,
+		isReplay: false,
+	},
+	serverNowMs: 1_700_000_000_000,
+	queue: [],
+	listeners: 1,
+	mySkipVoted: false,
+	enqueueCooldownRemainingSec: 0,
+};
+
+describe("getState", () => {
+	it("calls GET /api/state and returns parsed state including enqueueCooldownRemainingSec and nowPlaying.isReplay", async () => {
+		mockFetch(exampleState);
+		const client = createJukeboxClient({ baseUrl: BASE });
+		const state = await client.getState();
+		expect(state).toEqual(exampleState);
+		expect(state.enqueueCooldownRemainingSec).toBe(0);
+		expect(state.nowPlaying?.isReplay).toBe(false);
+		expect(vi.mocked(fetch)).toHaveBeenCalledWith(`${BASE}/api/state`, {
+			method: "GET",
+			credentials: "omit",
+		});
+	});
+
+	it("throws with status on 500", async () => {
+		mockFetch({}, 500);
+		const client = createJukeboxClient({ baseUrl: BASE });
+		await expect(client.getState()).rejects.toMatchObject({ status: 500 });
+	});
+});
+
+describe("postPresence", () => {
+	it("calls POST /api/presence with no body and resolves void", async () => {
+		mockFetch({ ok: true });
+		const client = createJukeboxClient({ baseUrl: BASE });
+		await expect(client.postPresence()).resolves.toBeUndefined();
+		expect(vi.mocked(fetch)).toHaveBeenCalledWith(`${BASE}/api/presence`, {
+			method: "POST",
+			credentials: "omit",
+		});
+	});
+
+	it("throws with status on 429", async () => {
+		mockFetch({}, 429);
+		const client = createJukeboxClient({ baseUrl: BASE });
+		await expect(client.postPresence()).rejects.toMatchObject({ status: 429 });
+	});
+});
+
+describe("enqueue", () => {
+	it("calls POST /api/queue with JSON body and resolves on 201", async () => {
+		mockFetch({ ok: true }, 201);
+		const client = createJukeboxClient({ baseUrl: BASE });
+		await expect(
+			client.enqueue("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+		).resolves.toBeUndefined();
+		expect(vi.mocked(fetch)).toHaveBeenCalledWith(`${BASE}/api/queue`, {
+			method: "POST",
+			credentials: "omit",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" }),
+		});
+	});
+
+	it("throws status 409 for already_queued", async () => {
+		mockFetch({}, 409);
+		const client = createJukeboxClient({ baseUrl: BASE });
+		await expect(
+			client.enqueue("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+		).rejects.toMatchObject({ status: 409 });
+	});
+
+	it("throws status 415 for unsupported media", async () => {
+		mockFetch({}, 415);
+		const client = createJukeboxClient({ baseUrl: BASE });
+		await expect(client.enqueue("https://vimeo.com/123")).rejects.toMatchObject({
+			status: 415,
+		});
+	});
+
+	it("throws status 429 for rate limit", async () => {
+		mockFetch({}, 429);
+		const client = createJukeboxClient({ baseUrl: BASE });
+		await expect(
+			client.enqueue("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+		).rejects.toMatchObject({ status: 429 });
+	});
+
+	it("throws status 400 for bad request", async () => {
+		mockFetch({}, 400);
+		const client = createJukeboxClient({ baseUrl: BASE });
+		await expect(client.enqueue("not-a-url")).rejects.toMatchObject({ status: 400 });
+	});
+
+	it("throws status 403 for forbidden", async () => {
+		mockFetch({}, 403);
+		const client = createJukeboxClient({ baseUrl: BASE });
+		await expect(
+			client.enqueue("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+		).rejects.toMatchObject({ status: 403 });
+	});
+});
+
+describe("cancelMine", () => {
+	it("calls DELETE /api/queue/mine and resolves void", async () => {
+		mockFetch({ ok: true });
+		const client = createJukeboxClient({ baseUrl: BASE });
+		await expect(client.cancelMine()).resolves.toBeUndefined();
+		expect(vi.mocked(fetch)).toHaveBeenCalledWith(`${BASE}/api/queue/mine`, {
+			method: "DELETE",
+			credentials: "omit",
+		});
+	});
+
+	it("throws status 404 when nothing to cancel", async () => {
+		mockFetch({}, 404);
+		const client = createJukeboxClient({ baseUrl: BASE });
+		await expect(client.cancelMine()).rejects.toMatchObject({ status: 404 });
+	});
+});
+
+describe("skipVote", () => {
+	it("calls POST /api/skip/vote and returns { skipped: false } when vote registered", async () => {
+		mockFetch({ skipped: false });
+		const client = createJukeboxClient({ baseUrl: BASE });
+		const result = await client.skipVote();
+		expect(result).toEqual({ skipped: false });
+		expect(vi.mocked(fetch)).toHaveBeenCalledWith(`${BASE}/api/skip/vote`, {
+			method: "POST",
+			credentials: "omit",
+		});
+	});
+
+	it("returns { skipped: true } when skip threshold reached", async () => {
+		mockFetch({ skipped: true });
+		const client = createJukeboxClient({ baseUrl: BASE });
+		const result = await client.skipVote();
+		expect(result).toEqual({ skipped: true });
+	});
+
+	it("throws status 429 when already voted", async () => {
+		mockFetch({}, 429);
+		const client = createJukeboxClient({ baseUrl: BASE });
+		await expect(client.skipVote()).rejects.toMatchObject({ status: 429 });
+	});
+});
