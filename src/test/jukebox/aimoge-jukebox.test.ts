@@ -5,6 +5,7 @@ import { AimogeJukeboxElement } from "#js/elements/aimoge-jukebox";
 interface MockYTPlayer {
 	seekTo: ReturnType<typeof vi.fn>;
 	loadVideoById: ReturnType<typeof vi.fn>;
+	getCurrentTime: ReturnType<typeof vi.fn>;
 	destroy: ReturnType<typeof vi.fn>;
 	_readyCallback: ((e: { target: MockYTPlayer }) => void) | undefined;
 }
@@ -21,6 +22,7 @@ function makeMockYT(): { Player: ReturnType<typeof vi.fn>; PlayerState: { ENDED:
 	) {
 		this.seekTo = vi.fn();
 		this.loadVideoById = vi.fn();
+		this.getCurrentTime = vi.fn().mockReturnValue(0);
 		this.destroy = vi.fn();
 		this._readyCallback = opts.events?.onReady;
 		// テストから onReady を手動で発火できるよう lastInstance に保存
@@ -270,6 +272,8 @@ describe("AimogeJukeboxElement", () => {
 	});
 
 	it("ドリフト > 2s: 同じ曲が再生中のとき state ポーリング後に seekTo が呼ばれる", async () => {
+		// リアルな進行中の曲: 10s 前に開始、サーバー時刻 1_000_000ms
+		// → expectedOffsetSec ≈ 10s。getCurrentTime が 0s を返す → drift=10s > 2s
 		const NP_MEDIA_ID = "abcdefghijk";
 		const stateWithDrift = {
 			...IDLE_STATE,
@@ -279,7 +283,7 @@ describe("AimogeJukeboxElement", () => {
 				title: "Drift Song",
 				durationSec: 300,
 				mine: false,
-				startedAtMs: 1_000_000 - 20_000,
+				startedAtMs: 1_000_000 - 10_000, // 10s 前に開始
 				isReplay: false,
 			},
 			serverNowMs: 1_000_000,
@@ -298,17 +302,22 @@ describe("AimogeJukeboxElement", () => {
 		playerInstance._readyCallback?.({ target: playerInstance });
 		expect(playerInstance.seekTo).toHaveBeenCalledTimes(1);
 
-		// 3s 経過 → 2 回目のポーリング（同じ mediaId, localPos=0, expected≈20 → drift>2s）
+		// getCurrentTime がずれた位置（0s）を返すようにスタブ → expected≈10s との drift=10s > 2s
+		playerInstance.getCurrentTime.mockReturnValue(0);
+
+		// 3s 経過 → 2 回目のポーリング（同じ mediaId, getCurrentTime()=0, expected≈10s → drift>2s）
 		await vi.advanceTimersByTimeAsync(3000);
 
 		// ドリフト補正 seekTo が追加で呼ばれる
 		expect(playerInstance.seekTo).toHaveBeenCalledTimes(2);
 		const [seekSec, allowAhead] = playerInstance.seekTo.mock.calls[1] as [number, boolean];
 		expect(allowAhead).toBe(true);
-		expect(seekSec).toBeGreaterThan(2); // expected ≈ 20s
+		expect(seekSec).toBeGreaterThan(2); // expected ≈ 10s
 	});
 
 	it("ドリフト <= 2s: seekTo は呼ばれない", async () => {
+		// リアルな進行中の曲: 10s 前に開始、サーバー時刻 1_000_000ms
+		// → expectedOffsetSec ≈ 10s。getCurrentTime も ≈ 10s を返す → drift ≈ 0s ≤ 2s
 		const stateNoDrift = {
 			...IDLE_STATE,
 			nowPlaying: {
@@ -317,7 +326,7 @@ describe("AimogeJukeboxElement", () => {
 				title: "No Drift Song",
 				durationSec: 300,
 				mine: false,
-				startedAtMs: 1_000_000,
+				startedAtMs: 1_000_000 - 10_000, // 10s 前に開始
 				isReplay: false,
 			},
 			serverNowMs: 1_000_000,
@@ -331,11 +340,16 @@ describe("AimogeJukeboxElement", () => {
 		const playerInstance = YTMock.Player._lastInstance;
 		if (!playerInstance) throw new Error("YT.Player not constructed");
 
-		// onReady を手動発火（初回 seek は expected≈0, localPos=0 → 正常）
+		// onReady を手動発火（初回 seek は expected≈10s → 正常）
 		playerInstance._readyCallback?.({ target: playerInstance });
 		const seekCountAfterReady = playerInstance.seekTo.mock.calls.length;
 
-		// 3s 経過 → 2 回目のポーリング（expected≈0+3s≈3s, localPos≈3s → drift≈0 ≤ 2s）
+		// getCurrentTime が同期している位置（≈10s）を返すようにスタブ
+		// ポーリング時 expectedOffsetSec = playbackOffsetSec(990_000, 1_000_000) + clientElapsed ≈ 10s
+		// getCurrentTime を 10s に設定 → drift = 0s ≤ 2s → seekTo 不要
+		playerInstance.getCurrentTime.mockReturnValue(10);
+
+		// 3s 経過 → 2 回目のポーリング
 		await vi.advanceTimersByTimeAsync(3000);
 
 		// ドリフト補正 seekTo は追加で呼ばれない

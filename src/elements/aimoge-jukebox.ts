@@ -10,6 +10,7 @@ import type { CustomElementClass } from "./types";
 interface YTPlayer {
 	seekTo(sec: number, allowSeekAhead: boolean): void;
 	loadVideoById(videoId: string, startSeconds?: number): void;
+	getCurrentTime(): number;
 	destroy(): void;
 }
 
@@ -140,8 +141,10 @@ export class AimogeJukeboxElement extends HTMLElement implements CustomElementCl
 
 		if (this.#currentMediaId === np.mediaId && this.#ytPlayer) {
 			// 同じ曲: ドリフト補正。
-			// YT IFrame API には getCurrentTime がないため localPos は 0 とみなす
-			const localPositionSec = 0;
+			const localPositionSec =
+				typeof this.#ytPlayer?.getCurrentTime === "function"
+					? (this.#ytPlayer.getCurrentTime() ?? 0)
+					: 0;
 			const expectedOffsetSec =
 				playbackOffsetSec(np.startedAtMs, state.serverNowMs) +
 				(Date.now() - this.#fetchedAtClientMs) / 1000;
