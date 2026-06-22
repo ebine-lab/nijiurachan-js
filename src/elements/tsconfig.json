@@ -12,6 +12,9 @@
             "path": "../components"
         },
         {
+            "path": "../io"
+        },
+        {
             "path": "../util"
         }
     ],
