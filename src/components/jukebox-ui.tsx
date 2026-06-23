@@ -28,12 +28,24 @@ function VoteButton(props: {
     onVote: (trackId: number) => Promise<void>
 }): VNode {
     const { trackId, myVoted, onVote } = props
+    // 投票はトグルなので、リクエスト飛行中は無効化して連打による多重トグルを防ぐ
+    const [submitting, setSubmitting] = useState(false)
+    async function handleClick(): Promise<void> {
+        if (submitting) return
+        setSubmitting(true)
+        try {
+            await onVote(trackId)
+        } finally {
+            setSubmitting(false)
+        }
+    }
     return (
         <button
             type="button"
             class={`jukebox-vote-btn${myVoted ? " is-voted" : ""}`}
             aria-pressed={myVoted}
-            onClick={() => void onVote(trackId)}
+            disabled={submitting}
+            onClick={() => void handleClick()}
         >
             {myVoted ? "投票済み(取消)" : "除外投票"}
         </button>
