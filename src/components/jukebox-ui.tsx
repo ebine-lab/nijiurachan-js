@@ -200,7 +200,7 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
                 <input
                     type="url"
                     value={urlInput}
-                    placeholder="YouTube または SoundCloud の URL を入力"
+                    placeholder="(Youtube/SoundCloud URL ≦10分)"
                     onInput={(e) =>
                         setUrlInput((e.target as HTMLInputElement).value)
                     }
