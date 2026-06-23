@@ -137,6 +137,8 @@ export class AimogeJukeboxElement extends HTMLElement {
     /** 履歴取得のリクエスト連番。古い応答で最新を上書きしないための識別子。 */
     #historyReqId: number = 0
     #volume: number = readStoredVolume()
+    /** ミュート中か。スピーカーアイコン押下でトグルし、player 再生成時も維持する。 */
+    #muted: boolean = false
     /** このインスタンス専用の YouTube player mount point id */
     readonly #playerId: string
 
@@ -314,6 +316,8 @@ export class AimogeJukeboxElement extends HTMLElement {
                             (Date.now() - this.#fetchedAtClientMs) / 1000
                         e.target.seekTo(currentExpected, true)
                         e.target.setVolume(this.#volume)
+                        // player 再生成（曲間など）でもミュート状態を引き継ぐ
+                        if (this.#muted) e.target.mute()
                         // 破棄→再生成フロー（曲間でキューが空→新曲、source 遷移など）でも
                         // ユーザーの再生意図(#wantPlay)を尊重して再開する。
                         // 初期は #wantPlay=false なので一時停止のまま（自動再生しない）。
@@ -424,6 +428,14 @@ export class AimogeJukeboxElement extends HTMLElement {
         }
     }
 
+    /** スピーカーアイコン押下でミュート/解除をトグルする。 */
+    #handleToggleMute(): void {
+        this.#muted = !this.#muted
+        if (this.#muted) this.#ytPlayer?.mute()
+        else this.#ytPlayer?.unMute()
+        this.#renderUI()
+    }
+
     /** 再生履歴パネルの開閉。開いたときに /api/history を取得して表示する。 */
     async #handleToggleHistory(): Promise<void> {
         this.#showHistory = !this.#showHistory
@@ -453,6 +465,8 @@ export class AimogeJukeboxElement extends HTMLElement {
                 isPlaying: this.#ytPlayer != null && this.#isPlaying,
                 volume: this.#volume,
                 onVolumeChange: (v: number) => this.#handleVolumeChange(v),
+                muted: this.#muted,
+                onToggleMute: () => this.#handleToggleMute(),
                 // no-player モードでは動画・再生ボタン・音量を描画しない
                 noPlayer: this.#noPlayer,
                 history: this.#history,

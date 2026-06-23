@@ -532,6 +532,46 @@ describe("AimogeJukeboxElement", () => {
         expect(playerInstance.setVolume).toHaveBeenCalledWith(50)
     })
 
+    it("スピーカーアイコン押下でミュート/解除をトグルする", async () => {
+        const stateWithNp = {
+            ...IDLE_STATE,
+            nowPlaying: {
+                id: 1,
+                source: "youtube" as const,
+                mediaId: "abcdefghijk",
+                title: "Mute Song",
+                durationSec: 300,
+                mine: false,
+                myVoted: false,
+                startedAtMs: 1_000_000,
+                isReplay: false,
+            },
+            serverNowMs: 1_000_000,
+        }
+        vi.stubGlobal("fetch", makeStateFetch(stateWithNp))
+
+        const el = mount()
+        await flushPromises()
+        const playerInstance = getMockYT().Player._lastInstance
+        if (!playerInstance) throw new Error("YT.Player not constructed")
+        playerInstance._readyCallback?.({ target: playerInstance })
+
+        const icon = (): HTMLElement | null =>
+            el.querySelector(".jukebox-volume-icon")
+        // 初期は未ミュート
+        expect(icon()?.getAttribute("aria-pressed")).toBe("false")
+        // 押すとミュート
+        icon()?.click()
+        await flushPromises()
+        expect(playerInstance.mute).toHaveBeenCalled()
+        expect(icon()?.getAttribute("aria-pressed")).toBe("true")
+        // もう一度押すと解除
+        icon()?.click()
+        await flushPromises()
+        expect(playerInstance.unMute).toHaveBeenCalled()
+        expect(icon()?.getAttribute("aria-pressed")).toBe("false")
+    })
+
     it("data-no-player 属性付きならプレイヤーを生成せず、UI（曲名）は表示する", async () => {
         const stateWithNp = {
             ...IDLE_STATE,
