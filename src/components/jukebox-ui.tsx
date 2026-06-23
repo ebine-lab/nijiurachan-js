@@ -8,6 +8,10 @@ export interface JukeboxUIProps {
     onEnqueue: (url: string) => Promise<void>
     onSkipVote: () => Promise<void>
     onCancelMine: () => Promise<void>
+    /** 再生/一時停止トグル（YT プレイヤーを直接操作） */
+    onTogglePlay: () => void
+    /** YT プレイヤーが再生中か（ボタン表示の切替に使う） */
+    isPlaying: boolean
     enqueueError: string | null
     /** YouTube プレイヤーをマウントする div の id。インスタンスごとに一意にする */
     playerId: string
@@ -26,6 +30,8 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
         onEnqueue,
         onSkipVote,
         onCancelMine,
+        onTogglePlay,
+        isPlaying,
         enqueueError,
         playerId,
     } = props
@@ -85,6 +91,19 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
 
             {/* YouTube IFrame がマウントされる要素。id はインスタンスごとに一意 */}
             <div id={playerId} />
+
+            {/* 独立した再生/一時停止ボタン（native コントロールとは別にメニューに置く） */}
+            <div class="jukebox-controls">
+                <button
+                    type="button"
+                    class="jukebox-playpause-btn"
+                    onClick={() => onTogglePlay()}
+                    disabled={state?.nowPlaying == null}
+                    aria-label={isPlaying ? "一時停止" : "再生"}
+                >
+                    {isPlaying ? "⏸ 一時停止" : "▶ 再生"}
+                </button>
+            </div>
 
             <ul class="jukebox-queue">
                 {state?.queue.map((item: JukeboxQueueItem, index: number) => (
