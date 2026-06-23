@@ -61,6 +61,12 @@ function loadYouTubeIframeApi(): void {
     const tag = document.createElement("script")
     tag.src = SRC
     tag.async = true
+    // 読み込み失敗時は失敗した <script> を DOM から除去する。残すと
+    // querySelector の二重注入ガードが恒久発動し、一度でも失敗すると
+    // リロードするまで再注入されず（プレイヤーが永遠に真っ黒に）なるため。
+    tag.onerror = (): void => {
+        tag.remove()
+    }
     document.head.appendChild(tag)
 }
 
