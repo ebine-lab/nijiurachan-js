@@ -1,9 +1,9 @@
 import { h, render } from "preact"
-import { enqueueErrorMessage, JukeboxUI } from "#js/components/jukebox-ui"
-import type { JukeboxClient } from "#js/io/jukebox-api"
-import { createJukeboxClient } from "#js/io/jukebox-api"
-import type { JukeboxState } from "#js/pure/jukebox"
-import { parseJukeboxUrl, playbackOffsetSec } from "#js/pure/jukebox"
+import { enqueueErrorMessage, JukeboxUI } from "../components/jukebox-ui"
+import type { JukeboxClient } from "../io/jukebox-api"
+import { createJukeboxClient } from "../io/jukebox-api"
+import type { JukeboxState } from "../pure/jukebox"
+import { parseJukeboxUrl, playbackOffsetSec } from "../pure/jukebox"
 
 // ─── YouTube IFrame Player API ambient types ──────────────────────────────────
 interface YTPlayer {

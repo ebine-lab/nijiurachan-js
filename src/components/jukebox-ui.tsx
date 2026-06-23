@@ -1,7 +1,7 @@
 /** @jsxImportSource preact */
 import type { VNode } from "preact"
 import { useState } from "preact/hooks"
-import type { JukeboxQueueItem, JukeboxState } from "#js/pure/jukebox"
+import type { JukeboxQueueItem, JukeboxState } from "../pure/jukebox"
 
 export interface JukeboxUIProps {
     state: JukeboxState | null
