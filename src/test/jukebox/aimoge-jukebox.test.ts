@@ -6,6 +6,7 @@ import type { JukeboxState } from "#js/pure/jukebox"
 interface MockYTPlayer {
     seekTo: ReturnType<typeof vi.fn>
     loadVideoById: ReturnType<typeof vi.fn>
+    cueVideoById: ReturnType<typeof vi.fn>
     getCurrentTime: ReturnType<typeof vi.fn>
     setVolume: ReturnType<typeof vi.fn>
     getVolume: ReturnType<typeof vi.fn>
@@ -34,6 +35,7 @@ function makeMockYT(): {
     ) {
         this.seekTo = vi.fn()
         this.loadVideoById = vi.fn()
+        this.cueVideoById = vi.fn()
         this.getCurrentTime = vi.fn().mockReturnValue(0)
         this.setVolume = vi.fn()
         this.getVolume = vi.fn().mockReturnValue(50)
@@ -206,6 +208,8 @@ describe("AimogeJukeboxElement", () => {
             expect.stringContaining("jukebox-yt-player"),
             expect.objectContaining({
                 videoId: "abcdefghijk",
+                // デフォルトは一時停止（自動再生しない）
+                playerVars: expect.objectContaining({ autoplay: 0 }),
             }),
         )
     })

@@ -24,6 +24,7 @@ function readStoredVolume(): number {
 interface YTPlayer {
     seekTo(sec: number, allowSeekAhead: boolean): void
     loadVideoById(videoId: string, startSeconds?: number): void
+    cueVideoById(videoId: string, startSeconds?: number): void
     getCurrentTime(): number
     playVideo(): void
     pauseVideo(): void
@@ -108,6 +109,11 @@ export class AimogeJukeboxElement extends HTMLElement {
     #fetchedAtClientMs: number = 0
     /** YT プレイヤーが再生中か（onStateChange で更新し、再生/一時停止ボタンに反映） */
     #isPlaying: boolean = false
+    /** ユーザーが再生を望んでいるか。デフォルトは false＝一時停止（自動再生しない）。
+     *  曲が server 側で進んでも、これが false の間は cue のみで音を出さない。 */
+    #wantPlay: boolean = false
+    /** 複数タブ/別窓での二重再生を防ぐチャンネル（誰かが再生したら他は止める） */
+    #playChannel: BroadcastChannel | null = null
     #volume: number = readStoredVolume()
     /** このインスタンス専用の YouTube player mount point id */
     readonly #playerId: string
@@ -128,6 +134,22 @@ export class AimogeJukeboxElement extends HTMLElement {
 
         // YouTube IFrame API を読み込む（window.YT が無いとプレイヤーが生成されず真っ黒になる）
         loadYouTubeIframeApi()
+
+        // 二重再生防止: 別タブ/別窓のジュークボックスが再生を始めたらこちらは止める
+        if (typeof BroadcastChannel !== "undefined") {
+            this.#playChannel = new BroadcastChannel("aimoge-jukebox")
+            this.#playChannel.onmessage = (ev: MessageEvent): void => {
+                const msg = ev.data as { type?: string; id?: string }
+                if (
+                    msg?.type === "playing" &&
+                    msg.id !== this.#playerId &&
+                    this.#isPlaying
+                ) {
+                    this.#wantPlay = false
+                    this.#ytPlayer?.pauseVideo()
+                }
+            }
+        }
 
         // 初回レンダー: プレイヤーマウント先 div を DOM に配置してから同期する
         this.#renderUI()
@@ -153,6 +175,8 @@ export class AimogeJukeboxElement extends HTMLElement {
         }
         this.#abortController?.abort()
         this.#abortController = null
+        this.#playChannel?.close()
+        this.#playChannel = null
         this.#ytPlayer?.destroy()
         this.#ytPlayer = null
         this.#currentMediaId = null
@@ -239,13 +263,19 @@ export class AimogeJukeboxElement extends HTMLElement {
             return
         }
 
-        // 新しい曲: プレイヤーを生成/差し替え
+        // 新しい曲: プレイヤーを生成/差し替え。
+        // ユーザーが再生中(#wantPlay)なら load で続けて再生、未再生なら cue で音を出さない。
         if (this.#ytPlayer) {
-            this.#ytPlayer.loadVideoById(np.mediaId, expectedSec)
+            if (this.#wantPlay) {
+                this.#ytPlayer.loadVideoById(np.mediaId, expectedSec)
+            } else {
+                this.#ytPlayer.cueVideoById(np.mediaId, expectedSec)
+            }
         } else {
             this.#ytPlayer = new window.YT.Player(this.#playerId, {
                 videoId: np.mediaId,
-                playerVars: { autoplay: 1, controls: 1 },
+                // autoplay:0 = デフォルト一時停止。再生は #handleTogglePlay（ユーザー操作）から。
+                playerVars: { autoplay: 0, controls: 1 },
                 events: {
                     onReady: (e: YTPlayerEvent): void => {
                         const currentExpected =
@@ -262,6 +292,13 @@ export class AimogeJukeboxElement extends HTMLElement {
                         // 再生/一時停止状態を再生ボタンへ反映
                         if (e.data === ps.PLAYING || e.data === ps.PAUSED) {
                             this.#isPlaying = e.data === ps.PLAYING
+                            // 自分が再生を始めたら、他タブ/別窓に通知して止めさせる
+                            if (this.#isPlaying) {
+                                this.#playChannel?.postMessage({
+                                    type: "playing",
+                                    id: this.#playerId,
+                                })
+                            }
                             this.#renderUI()
                         }
                         // ENDED → 次のポーリングで advance されるのを待つだけ
@@ -321,8 +358,19 @@ export class AimogeJukeboxElement extends HTMLElement {
     #handleTogglePlay(): void {
         if (!this.#ytPlayer) return
         if (this.#isPlaying) {
+            this.#wantPlay = false
             this.#ytPlayer.pauseVideo()
         } else {
+            this.#wantPlay = true
+            // 再生開始時はライブ位置へ合わせてから再生（押した時点の現在地に追いつく）
+            const st = this.#state
+            const np = st?.nowPlaying
+            if (st && np) {
+                const liveSec =
+                    playbackOffsetSec(np.startedAtMs, st.serverNowMs) +
+                    (Date.now() - this.#fetchedAtClientMs) / 1000
+                this.#ytPlayer.seekTo(liveSec, true)
+            }
             this.#ytPlayer.playVideo()
         }
     }
