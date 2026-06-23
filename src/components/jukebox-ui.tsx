@@ -228,8 +228,12 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
     )
 }
 
-/** HttpError.status を日本語メッセージに変換する（enqueue 用） */
-export function enqueueErrorMessage(status: number): string {
+/** HttpError(status, code) を日本語メッセージに変換する（enqueue 用） */
+export function enqueueErrorMessage(
+    status: number,
+    code?: string | null,
+): string {
+    if (code === "duration_too_long") return "10分未満の動画のみ追加できます"
     if (status === 403) return "追加は書き込んだユーザーのみ可能です"
     if (status === 409) return "既に1曲追加済みです（再生後にまた追加できます）"
     if (status === 415) return "対応していない URL です"

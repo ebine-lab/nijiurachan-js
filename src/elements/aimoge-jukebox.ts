@@ -285,9 +285,9 @@ export class AimogeJukeboxElement extends HTMLElement {
             // 即座に state を再取得してキューを更新
             void this.#pollState()
         } catch (e) {
-            const status = (e as { status?: number }).status ?? 0
-            // enqueueErrorMessage: 403/409/415/429 → 日本語メッセージ
-            this.#enqueueError = enqueueErrorMessage(status)
+            const err = e as { status?: number; code?: string | null }
+            // enqueueErrorMessage: code(duration_too_long 等) 優先 → 403/409/415/429
+            this.#enqueueError = enqueueErrorMessage(err.status ?? 0, err.code)
             this.#renderUI()
         }
     }
