@@ -9,10 +9,15 @@ import { parseJukeboxUrl, playbackOffsetSec } from "../pure/jukebox"
 const VOLUME_STORAGE_KEY = "aimoge_jukebox_volume"
 const DEFAULT_VOLUME = 50
 function readStoredVolume(): number {
-    if (typeof localStorage === "undefined") return DEFAULT_VOLUME
-    const raw = localStorage.getItem(VOLUME_STORAGE_KEY)
-    const n = raw == null ? Number.NaN : Number(raw)
-    return Number.isFinite(n) && n >= 0 && n <= 100 ? n : DEFAULT_VOLUME
+    try {
+        if (typeof localStorage === "undefined") return DEFAULT_VOLUME
+        const raw = localStorage.getItem(VOLUME_STORAGE_KEY)
+        const n = raw == null ? Number.NaN : Number(raw)
+        return Number.isFinite(n) && n >= 0 && n <= 100 ? n : DEFAULT_VOLUME
+    } catch {
+        // プライベートブラウジング / SecurityError 等で getItem が投げる環境 → 既定値
+        return DEFAULT_VOLUME
+    }
 }
 
 // ─── YouTube IFrame Player API ambient types ──────────────────────────────────
@@ -327,8 +332,12 @@ export class AimogeJukeboxElement extends HTMLElement {
     #handleVolumeChange(volume: number): void {
         this.#volume = volume
         this.#ytPlayer?.setVolume(volume)
-        if (typeof localStorage !== "undefined") {
-            localStorage.setItem(VOLUME_STORAGE_KEY, String(volume))
+        try {
+            if (typeof localStorage !== "undefined") {
+                localStorage.setItem(VOLUME_STORAGE_KEY, String(volume))
+            }
+        } catch {
+            // 保存不可環境（プライベートブラウジング / SecurityError 等）は無視
         }
     }
 

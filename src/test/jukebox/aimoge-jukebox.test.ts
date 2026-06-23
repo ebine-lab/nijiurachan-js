@@ -497,7 +497,9 @@ describe("AimogeJukeboxElement", () => {
     })
 
     it("onReady で初期音量（localStorage 未設定なら既定の真ん中=50）が適用される", async () => {
-        // テスト環境に localStorage は無い → readStoredVolume() は既定 50 を返す
+        // localStorage があればキーを消して順序非依存にする（テスト環境では undefined なので no-op）
+        if (typeof localStorage !== "undefined")
+            localStorage.removeItem("aimoge_jukebox_volume")
         const stateWithNp = {
             ...IDLE_STATE,
             nowPlaying: {
