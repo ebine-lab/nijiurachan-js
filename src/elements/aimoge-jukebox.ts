@@ -49,6 +49,28 @@ const DEFAULT_BASE_URL = "https://music.nijiurachan.net"
 let instanceCounter = 0
 
 /**
+ * YouTube IFrame Player API をロードする（未ロードのときだけ <script> を一度注入）。
+ * ロード完了で window.YT.Player が使えるようになり、次のポーリングで #syncPlayer が
+ * プレイヤーを生成する。これが無いと window.YT が永遠に undefined で再生されない（画面が真っ黒）。
+ */
+function loadYouTubeIframeApi(): void {
+    if (typeof window === "undefined" || typeof document === "undefined") return
+    if (window.YT?.Player) return
+    const SRC = "https://www.youtube.com/iframe_api"
+    if (document.querySelector(`script[src="${SRC}"]`)) return
+    const tag = document.createElement("script")
+    tag.src = SRC
+    tag.async = true
+    // 読み込み失敗時は失敗した <script> を DOM から除去する。残すと
+    // querySelector の二重注入ガードが恒久発動し、一度でも失敗すると
+    // リロードするまで再注入されず（プレイヤーが永遠に真っ黒に）なるため。
+    tag.onerror = (): void => {
+        tag.remove()
+    }
+    document.head.appendChild(tag)
+}
+
+/**
  * あいもげジュークボックス custom element。
  * `data-api-base` 属性でバックエンドの base URL を指定できる（省略時は DEFAULT_BASE_URL）。
  *
@@ -83,6 +105,9 @@ export class AimogeJukeboxElement extends HTMLElement {
         const baseUrl =
             this.getAttribute("data-api-base")?.trim() || DEFAULT_BASE_URL
         this.#client = createJukeboxClient({ baseUrl })
+
+        // YouTube IFrame API を読み込む（window.YT が無いとプレイヤーが生成されず真っ黒になる）
+        loadYouTubeIframeApi()
 
         // 初回レンダー: プレイヤーマウント先 div を DOM に配置してから同期する
         this.#renderUI()
@@ -251,9 +276,9 @@ export class AimogeJukeboxElement extends HTMLElement {
         }
     }
 
-    async #handleSkipVote(): Promise<void> {
+    async #handleVote(trackId: number): Promise<void> {
         try {
-            await this.#client?.skipVote()
+            await this.#client?.vote(trackId)
             void this.#pollState()
         } catch {
             // サイレント無視
@@ -286,7 +311,7 @@ export class AimogeJukeboxElement extends HTMLElement {
             h(JukeboxUI, {
                 state: this.#state,
                 onEnqueue: (url: string) => this.#handleEnqueue(url),
-                onSkipVote: () => this.#handleSkipVote(),
+                onVote: (trackId: number) => this.#handleVote(trackId),
                 onCancelMine: () => this.#handleCancelMine(),
                 onTogglePlay: () => this.#handleTogglePlay(),
                 // プレイヤー未生成/破棄後は再生中表示を残さない

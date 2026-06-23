@@ -3,11 +3,15 @@
 export type JukeboxSource = "youtube" | "soundcloud"
 
 export interface JukeboxQueueItem {
+    /** トラックの一意 ID。除外投票（POST /api/skip/vote）の対象指定に使う */
+    id: number
     source: JukeboxSource
     mediaId: string
     title: string | null
     durationSec: number
     mine: boolean
+    /** 呼び出し元がこのトラックに除外投票済みか（永続化された投票状態） */
+    myVoted: boolean
 }
 
 export interface JukeboxNowPlaying extends JukeboxQueueItem {

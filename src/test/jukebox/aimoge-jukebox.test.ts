@@ -177,11 +177,13 @@ describe("AimogeJukeboxElement", () => {
         const stateWithPlaying = {
             ...IDLE_STATE,
             nowPlaying: {
+                id: 1,
                 source: "youtube" as const,
                 mediaId: "abcdefghijk",
                 title: "Test Song",
                 durationSec: 180,
                 mine: false,
+                myVoted: false,
                 startedAtMs: 1_000_000 - 10_000, // 10 秒前に開始
                 isReplay: false,
             },
@@ -204,11 +206,13 @@ describe("AimogeJukeboxElement", () => {
         const stateWithPlaying = {
             ...IDLE_STATE,
             nowPlaying: {
+                id: 1,
                 source: "youtube" as const,
                 mediaId: "abcdefghijk",
                 title: "Test Song",
                 durationSec: 180,
                 mine: false,
+                myVoted: false,
                 startedAtMs: 1_000_000 - 10_000,
                 isReplay: false,
             },
@@ -369,11 +373,13 @@ describe("AimogeJukeboxElement", () => {
         const stateWithPlaying = {
             ...IDLE_STATE,
             nowPlaying: {
+                id: 1,
                 source: "youtube" as const,
                 mediaId: "abcdefghijk",
                 title: "Test Song",
                 durationSec: 180,
                 mine: false,
+                myVoted: false,
                 startedAtMs: 1_000_000 - 10_000,
                 isReplay: false,
             },
@@ -395,11 +401,13 @@ describe("AimogeJukeboxElement", () => {
         const stateWithDrift = {
             ...IDLE_STATE,
             nowPlaying: {
+                id: 1,
                 source: "youtube" as const,
                 mediaId: NP_MEDIA_ID,
                 title: "Drift Song",
                 durationSec: 300,
                 mine: false,
+                myVoted: false,
                 startedAtMs: 1_000_000 - 10_000, // 10s 前に開始
                 isReplay: false,
             },
@@ -441,11 +449,13 @@ describe("AimogeJukeboxElement", () => {
         const stateNoDrift = {
             ...IDLE_STATE,
             nowPlaying: {
+                id: 1,
                 source: "youtube" as const,
                 mediaId: "nodriftxxxxx",
                 title: "No Drift Song",
                 durationSec: 300,
                 mine: false,
+                myVoted: false,
                 startedAtMs: 1_000_000 - 10_000, // 10s 前に開始
                 isReplay: false,
             },

@@ -6,7 +6,8 @@ import type { JukeboxQueueItem, JukeboxState } from "../pure/jukebox"
 export interface JukeboxUIProps {
     state: JukeboxState | null
     onEnqueue: (url: string) => Promise<void>
-    onSkipVote: () => Promise<void>
+    /** 指定トラックの除外投票をトグルする（再生中・キュー共通） */
+    onVote: (trackId: number) => Promise<void>
     onCancelMine: () => Promise<void>
     /** 再生/一時停止トグル（YT プレイヤーを直接操作） */
     onTogglePlay: () => void
@@ -15,6 +16,40 @@ export interface JukeboxUIProps {
     enqueueError: string | null
     /** YouTube プレイヤーをマウントする div の id。インスタンスごとに一意にする */
     playerId: string
+}
+
+/**
+ * 除外投票ボタン。再生中・キューの各トラックに共通で使う。
+ * myVoted で投票済み表示をトグルし、`is-voted` クラス + aria-pressed をホスト CSS 用に出す。
+ */
+function VoteButton(props: {
+    trackId: number
+    myVoted: boolean
+    onVote: (trackId: number) => Promise<void>
+}): VNode {
+    const { trackId, myVoted, onVote } = props
+    // 投票はトグルなので、リクエスト飛行中は無効化して連打による多重トグルを防ぐ
+    const [submitting, setSubmitting] = useState(false)
+    async function handleClick(): Promise<void> {
+        if (submitting) return
+        setSubmitting(true)
+        try {
+            await onVote(trackId)
+        } finally {
+            setSubmitting(false)
+        }
+    }
+    return (
+        <button
+            type="button"
+            class={`jukebox-vote-btn${myVoted ? " is-voted" : ""}`}
+            aria-pressed={myVoted}
+            disabled={submitting}
+            onClick={() => void handleClick()}
+        >
+            {myVoted ? "投票済み(取消)" : "除外投票"}
+        </button>
+    )
 }
 
 /** state.enqueueCooldownRemainingSec を "N分S秒" 形式に変換する */
@@ -28,7 +63,7 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
     const {
         state,
         onEnqueue,
-        onSkipVote,
+        onVote,
         onCancelMine,
         onTogglePlay,
         isPlaying,
@@ -69,16 +104,11 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
                                 ♻️ ラジオ（自動再生）
                             </span>
                         )}
-                        <button
-                            type="button"
-                            class="jukebox-skip-btn"
-                            disabled={state.mySkipVoted}
-                            onClick={() => void onSkipVote()}
-                        >
-                            {state.mySkipVoted
-                                ? "スキップ投票済み"
-                                : "スキップ投票"}
-                        </button>
+                        <VoteButton
+                            trackId={state.nowPlaying.id}
+                            myVoted={state.nowPlaying.myVoted}
+                            onVote={onVote}
+                        />
                     </>
                 ) : (
                     <span>再生なし</span>
@@ -109,6 +139,11 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
                 {state?.queue.map((item: JukeboxQueueItem, index: number) => (
                     <li key={`${index}-${item.source}:${item.mediaId}`}>
                         {item.title ?? item.mediaId}
+                        <VoteButton
+                            trackId={item.id}
+                            myVoted={item.myVoted}
+                            onVote={onVote}
+                        />
                         {item.mine && (
                             <button
                                 type="button"
