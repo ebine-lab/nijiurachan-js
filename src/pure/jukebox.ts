@@ -64,18 +64,6 @@ function parseYouTubeShort(url: URL): ParsedJukeboxMedia | null {
     return null
 }
 
-function parseSoundCloud(url: URL): ParsedJukeboxMedia | null {
-    const host = url.hostname.replace(/^www\./, "")
-    if (host !== "soundcloud.com") return null
-    // pathname must be exactly /<user>/<track> — two segments, no trailing slash
-    const match = url.pathname.match(/^\/([^/]+)\/([^/]+)$/)
-    if (!match) return null
-    return {
-        source: "soundcloud",
-        mediaId: `${match[1] as string}/${match[2] as string}`,
-    }
-}
-
 export function parseJukeboxUrl(rawUrl: string): ParsedJukeboxMedia | null {
     let url: URL
     try {
@@ -83,7 +71,8 @@ export function parseJukeboxUrl(rawUrl: string): ParsedJukeboxMedia | null {
     } catch {
         return null
     }
-    return parseYouTube(url) ?? parseYouTubeShort(url) ?? parseSoundCloud(url)
+    // SoundCloud 対応は廃止。YouTube（watch / youtu.be / shorts）のみ。
+    return parseYouTube(url) ?? parseYouTubeShort(url)
 }
 
 export function playbackOffsetSec(

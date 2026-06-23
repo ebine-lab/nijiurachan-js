@@ -71,37 +71,21 @@ describe("parseJukeboxUrl — YouTube shorts/", () => {
     })
 })
 
-describe("parseJukeboxUrl — SoundCloud", () => {
-    it("parses soundcloud.com/<user>/<track>", () => {
+describe("parseJukeboxUrl — SoundCloud は非対応（廃止）", () => {
+    it("returns null for soundcloud.com/<user>/<track>", () => {
         expect(
             parseJukeboxUrl("https://soundcloud.com/artist-name/track-title"),
-        ).toEqual({
-            source: "soundcloud",
-            mediaId: "artist-name/track-title",
-        })
+        ).toBeNull()
     })
 
-    it("parses with www prefix", () => {
+    it("returns null with www prefix", () => {
         expect(
             parseJukeboxUrl("https://www.soundcloud.com/dj/my-song"),
-        ).toEqual({
-            source: "soundcloud",
-            mediaId: "dj/my-song",
-        })
+        ).toBeNull()
     })
 
     it("returns null for soundcloud root", () => {
         expect(parseJukeboxUrl("https://soundcloud.com/")).toBeNull()
-    })
-
-    it("returns null for soundcloud user page only (no track segment)", () => {
-        expect(parseJukeboxUrl("https://soundcloud.com/artist")).toBeNull()
-    })
-
-    it("returns null for soundcloud deeper nesting", () => {
-        expect(
-            parseJukeboxUrl("https://soundcloud.com/artist/track/extra"),
-        ).toBeNull()
     })
 })
 

@@ -87,11 +87,10 @@ function VolumeSlider(props: {
     )
 }
 
-/** source + mediaId から元動画の URL を組み立てる */
-function mediaUrl(source: string, mediaId: string): string {
-    if (source === "youtube") return `https://youtu.be/${mediaId}`
-    if (source === "soundcloud") return `https://soundcloud.com/${mediaId}`
-    return mediaId
+/** YouTube の mediaId から watch URL を組み立てる（href 用に encode）。
+ *  YouTube 以外は対応しないため、リンクは youtube のときだけ描画する。 */
+function youtubeWatchUrl(mediaId: string): string {
+    return `https://youtu.be/${encodeURIComponent(mediaId)}`
 }
 
 /** state.enqueueCooldownRemainingSec を "N分S秒" 形式に変換する */
@@ -193,14 +192,16 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
                 {state?.queue.map((item: JukeboxQueueItem, index: number) => (
                     <li key={`${index}-${item.source}:${item.mediaId}`}>
                         {item.title ?? item.mediaId}
-                        <a
-                            class="jukebox-queue-url"
-                            href={mediaUrl(item.source, item.mediaId)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
-                            {mediaUrl(item.source, item.mediaId)}
-                        </a>
+                        {item.source === "youtube" && (
+                            <a
+                                class="jukebox-queue-url"
+                                href={youtubeWatchUrl(item.mediaId)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                {youtubeWatchUrl(item.mediaId)}
+                            </a>
+                        )}
                         <VoteButton
                             trackId={item.id}
                             myVoted={item.myVoted}
@@ -226,7 +227,7 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
                 <input
                     type="url"
                     value={urlInput}
-                    placeholder="(YouTube/SoundCloud URL 10分未満)"
+                    placeholder="(YouTube URL 10分未満)"
                     onInput={(e) =>
                         setUrlInput((e.target as HTMLInputElement).value)
                     }
