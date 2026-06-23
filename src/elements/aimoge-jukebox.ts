@@ -347,8 +347,7 @@ export class AimogeJukeboxElement extends HTMLElement {
     async #handleEnqueue(url: string): Promise<void> {
         const parsed = parseJukeboxUrl(url)
         if (!parsed) {
-            this.#enqueueError =
-                "YouTube または SoundCloud の URL を入力してください"
+            this.#enqueueError = "YouTube の URL を入力してください"
             this.#renderUI()
             return
         }
