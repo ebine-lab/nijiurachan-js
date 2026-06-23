@@ -251,9 +251,9 @@ export class AimogeJukeboxElement extends HTMLElement {
         }
     }
 
-    async #handleSkipVote(): Promise<void> {
+    async #handleVote(trackId: number): Promise<void> {
         try {
-            await this.#client?.skipVote()
+            await this.#client?.vote(trackId)
             void this.#pollState()
         } catch {
             // サイレント無視
@@ -286,7 +286,7 @@ export class AimogeJukeboxElement extends HTMLElement {
             h(JukeboxUI, {
                 state: this.#state,
                 onEnqueue: (url: string) => this.#handleEnqueue(url),
-                onSkipVote: () => this.#handleSkipVote(),
+                onVote: (trackId: number) => this.#handleVote(trackId),
                 onCancelMine: () => this.#handleCancelMine(),
                 onTogglePlay: () => this.#handleTogglePlay(),
                 // プレイヤー未生成/破棄後は再生中表示を残さない

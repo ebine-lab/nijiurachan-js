@@ -21,11 +21,13 @@ afterEach(() => {
 
 const exampleState: JukeboxState = {
     nowPlaying: {
+        id: 1,
         source: "youtube",
         mediaId: "dQw4w9WgXcQ",
         title: "Test Song",
         durationSec: 212,
         mine: false,
+        myVoted: false,
         startedAtMs: 1_700_000_000_000 - 30_000,
         isReplay: false,
     },
@@ -158,29 +160,51 @@ describe("cancelMine", () => {
     })
 })
 
-describe("skipVote", () => {
-    it("calls POST /api/skip/vote and returns { skipped: false } when vote registered", async () => {
-        mockFetch({ skipped: false })
+describe("vote", () => {
+    it("calls POST /api/skip/vote with { trackId } body and returns { voted: true, removed: false } when vote registered", async () => {
+        mockFetch({ voted: true, removed: false })
         const client = createJukeboxClient({ baseUrl: BASE })
-        const result = await client.skipVote()
-        expect(result).toEqual({ skipped: false })
+        const result = await client.vote(42)
+        expect(result).toEqual({ voted: true, removed: false })
         expect(vi.mocked(fetch)).toHaveBeenCalledWith(`${BASE}/api/skip/vote`, {
             method: "POST",
             credentials: "omit",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ trackId: 42 }),
         })
     })
 
-    it("returns { skipped: true } when skip threshold reached", async () => {
-        mockFetch({ skipped: true })
+    it("returns { voted: false, removed: false } when vote toggled off (cancelled)", async () => {
+        mockFetch({ voted: false, removed: false })
         const client = createJukeboxClient({ baseUrl: BASE })
-        const result = await client.skipVote()
-        expect(result).toEqual({ skipped: true })
+        const result = await client.vote(42)
+        expect(result).toEqual({ voted: false, removed: false })
     })
 
-    it("throws status 429 when already voted", async () => {
+    it("returns { voted: true, removed: true } when threshold reached and track removed/skipped", async () => {
+        mockFetch({ voted: true, removed: true })
+        const client = createJukeboxClient({ baseUrl: BASE })
+        const result = await client.vote(7)
+        expect(result).toEqual({ voted: true, removed: true })
+    })
+
+    it("omitting trackId targets the playing track (sends empty body, back-compat)", async () => {
+        mockFetch({ voted: true, removed: false })
+        const client = createJukeboxClient({ baseUrl: BASE })
+        const result = await client.vote()
+        expect(result).toEqual({ voted: true, removed: false })
+        expect(vi.mocked(fetch)).toHaveBeenCalledWith(`${BASE}/api/skip/vote`, {
+            method: "POST",
+            credentials: "omit",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+        })
+    })
+
+    it("throws status 429 on rate limit", async () => {
         mockFetch({}, 429)
         const client = createJukeboxClient({ baseUrl: BASE })
-        await expect(client.skipVote()).rejects.toMatchObject({ status: 429 })
+        await expect(client.vote(1)).rejects.toMatchObject({ status: 429 })
     })
 })
 
