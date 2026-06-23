@@ -2,7 +2,7 @@ import { h, render } from "preact"
 import { enqueueErrorMessage, JukeboxUI } from "../components/jukebox-ui"
 import type { JukeboxClient } from "../io/jukebox-api"
 import { createJukeboxClient } from "../io/jukebox-api"
-import type { JukeboxState } from "../pure/jukebox"
+import type { JukeboxHistoryItem, JukeboxState } from "../pure/jukebox"
 import { parseJukeboxUrl, playbackOffsetSec } from "../pure/jukebox"
 
 // 音量(0-100)は localStorage に永続化する。初期値は真ん中(50)。
@@ -131,6 +131,11 @@ export class AimogeJukeboxElement extends HTMLElement {
     /** data-no-player 属性付きのときは YT プレイヤーを生成せず、再生/音量/動画 UI も出さない。
      *  PC 本窓のように「操作・表示だけ・再生は別窓に任せる」用途で使う。 */
     #noPlayer: boolean = false
+    /** 再生履歴（直近24h）と表示状態。開いたときに /api/history を取得する。 */
+    #history: JukeboxHistoryItem[] = []
+    #showHistory: boolean = false
+    /** 履歴取得のリクエスト連番。古い応答で最新を上書きしないための識別子。 */
+    #historyReqId: number = 0
     #volume: number = readStoredVolume()
     /** このインスタンス専用の YouTube player mount point id */
     readonly #playerId: string
@@ -419,6 +424,23 @@ export class AimogeJukeboxElement extends HTMLElement {
         }
     }
 
+    /** 再生履歴パネルの開閉。開いたときに /api/history を取得して表示する。 */
+    async #handleToggleHistory(): Promise<void> {
+        this.#showHistory = !this.#showHistory
+        this.#renderUI()
+        if (!this.#showHistory) return
+        // 連打/遅延応答対策: 最新リクエストの応答だけを反映する（古い応答で上書きしない）。
+        const reqId = ++this.#historyReqId
+        try {
+            const res = await this.#client?.getHistory()
+            if (reqId !== this.#historyReqId) return
+            this.#history = res?.history ?? []
+            this.#renderUI()
+        } catch {
+            // 取得失敗はサイレント（空のまま）
+        }
+    }
+
     #renderUI(): void {
         render(
             h(JukeboxUI, {
@@ -433,6 +455,9 @@ export class AimogeJukeboxElement extends HTMLElement {
                 onVolumeChange: (v: number) => this.#handleVolumeChange(v),
                 // no-player モードでは動画・再生ボタン・音量を描画しない
                 noPlayer: this.#noPlayer,
+                history: this.#history,
+                showHistory: this.#showHistory,
+                onToggleHistory: () => void this.#handleToggleHistory(),
                 enqueueError: this.#enqueueError,
                 playerId: this.#playerId,
             }),

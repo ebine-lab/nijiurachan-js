@@ -1,5 +1,5 @@
 // src/io/jukebox-api.ts
-import type { JukeboxState } from "../pure/jukebox"
+import type { JukeboxHistory, JukeboxState } from "../pure/jukebox"
 
 export interface JukeboxClientOptions {
     baseUrl: string
@@ -36,6 +36,8 @@ export interface JukeboxVoteResult {
 
 export interface JukeboxClient {
     getState(): Promise<JukeboxState>
+    /** 直近24hの再生履歴（GET /api/history）。 */
+    getHistory(): Promise<JukeboxHistory>
     postPresence(): Promise<void>
     enqueue(url: string): Promise<void>
     cancelMine(): Promise<void>
@@ -59,6 +61,15 @@ export function createJukeboxClient({
             })
             await throwIfNotOk(res)
             return res.json() as Promise<JukeboxState>
+        },
+
+        async getHistory(): Promise<JukeboxHistory> {
+            const res = await fetch(`${base}/api/history`, {
+                method: "GET",
+                credentials: "omit",
+            })
+            await throwIfNotOk(res)
+            return res.json() as Promise<JukeboxHistory>
         },
 
         async postPresence(): Promise<void> {
