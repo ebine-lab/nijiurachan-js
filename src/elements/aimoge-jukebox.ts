@@ -289,7 +289,8 @@ export class AimogeJukeboxElement extends HTMLElement {
                 onSkipVote: () => this.#handleSkipVote(),
                 onCancelMine: () => this.#handleCancelMine(),
                 onTogglePlay: () => this.#handleTogglePlay(),
-                isPlaying: this.#isPlaying,
+                // プレイヤー未生成/破棄後は再生中表示を残さない
+                isPlaying: this.#ytPlayer != null && this.#isPlaying,
                 enqueueError: this.#enqueueError,
                 playerId: this.#playerId,
             }),
