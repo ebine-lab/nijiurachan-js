@@ -17,6 +17,8 @@ export interface JukeboxUIProps {
     volume: number
     /** 音量(0-100)の変更ハンドラ */
     onVolumeChange: (volume: number) => void
+    /** true のとき動画・再生ボタン・音量を描画しない（再生は別窓に委譲する本窓用） */
+    noPlayer?: boolean
     enqueueError: string | null
     /** YouTube プレイヤーをマウントする div の id。インスタンスごとに一意にする */
     playerId: string
@@ -102,6 +104,7 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
         isPlaying,
         volume,
         onVolumeChange,
+        noPlayer,
         enqueueError,
         playerId,
     } = props
@@ -154,22 +157,30 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
                 {state != null ? `${state.listeners}人が聴いています` : ""}
             </div>
 
-            {/* YouTube IFrame がマウントされる要素。id はインスタンスごとに一意 */}
-            <div id={playerId} />
+            {/* no-player モードでは動画・再生ボタン・音量を出さない（再生は別窓に委譲） */}
+            {!noPlayer && (
+                <>
+                    {/* YouTube IFrame がマウントされる要素。id はインスタンスごとに一意 */}
+                    <div id={playerId} />
 
-            {/* 独立した再生/一時停止ボタン（native コントロールとは別にメニューに置く） */}
-            <div class="jukebox-controls">
-                <button
-                    type="button"
-                    class="jukebox-playpause-btn"
-                    onClick={() => onTogglePlay()}
-                    disabled={state?.nowPlaying == null}
-                    aria-label={isPlaying ? "一時停止" : "再生"}
-                >
-                    {isPlaying ? "⏸ 一時停止" : "▶ 再生"}
-                </button>
-                <VolumeSlider volume={volume} onVolumeChange={onVolumeChange} />
-            </div>
+                    {/* 独立した再生/一時停止ボタン（native コントロールとは別にメニューに置く） */}
+                    <div class="jukebox-controls">
+                        <button
+                            type="button"
+                            class="jukebox-playpause-btn"
+                            onClick={() => onTogglePlay()}
+                            disabled={state?.nowPlaying == null}
+                            aria-label={isPlaying ? "一時停止" : "再生"}
+                        >
+                            {isPlaying ? "⏸ 一時停止" : "▶ 再生"}
+                        </button>
+                        <VolumeSlider
+                            volume={volume}
+                            onVolumeChange={onVolumeChange}
+                        />
+                    </div>
+                </>
+            )}
 
             <ul class="jukebox-queue">
                 {state?.queue.map((item: JukeboxQueueItem, index: number) => (
