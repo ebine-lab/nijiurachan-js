@@ -128,6 +128,9 @@ export class AimogeJukeboxElement extends HTMLElement {
     #playChannel: BroadcastChannel | null = null
     /** BroadcastChannel 送信元判定用のタブ横断で一意な ID（#playerId は別タブと衝突するため別途） */
     readonly #instanceId: string = makeInstanceId()
+    /** data-no-player 属性付きのときは YT プレイヤーを生成せず、再生/音量/動画 UI も出さない。
+     *  PC 本窓のように「操作・表示だけ・再生は別窓に任せる」用途で使う。 */
+    #noPlayer: boolean = false
     #volume: number = readStoredVolume()
     /** このインスタンス専用の YouTube player mount point id */
     readonly #playerId: string
@@ -146,8 +149,12 @@ export class AimogeJukeboxElement extends HTMLElement {
             this.getAttribute("data-api-base")?.trim() || DEFAULT_BASE_URL
         this.#client = createJukeboxClient({ baseUrl })
 
+        // no-player モード: プレイヤーを持たず、操作・表示だけ行う（PC 本窓 → 再生は別窓に委譲）
+        this.#noPlayer = this.hasAttribute("data-no-player")
+
         // YouTube IFrame API を読み込む（window.YT が無いとプレイヤーが生成されず真っ黒になる）
-        loadYouTubeIframeApi()
+        // no-player モードでは不要なので読み込まない。
+        if (!this.#noPlayer) loadYouTubeIframeApi()
 
         // 二重再生防止: 別タブ/別窓のジュークボックスが再生を始めたらこちらは止める
         if (typeof BroadcastChannel !== "undefined") {
@@ -239,6 +246,8 @@ export class AimogeJukeboxElement extends HTMLElement {
     }
 
     #syncPlayer(state: JukeboxState): void {
+        // no-player モードはプレイヤーを一切持たない（再生は別窓に委譲）
+        if (this.#noPlayer) return
         const np = state.nowPlaying
         if (!np || np.source !== "youtube") {
             if (this.#ytPlayer) {
@@ -309,14 +318,18 @@ export class AimogeJukeboxElement extends HTMLElement {
                         const ps = window.YT.PlayerState
                         // 再生/一時停止状態を再生ボタンへ反映
                         if (e.data === ps.PLAYING || e.data === ps.PAUSED) {
-                            this.#isPlaying = e.data === ps.PLAYING
-                            // 自分が再生を始めたら、他タブ/別窓に通知して止めさせる
-                            if (this.#isPlaying) {
+                            const playing = e.data === ps.PLAYING
+                            // 「停止/一時停止 → 再生」へ移った時だけ他タブ/別窓へ通知する。
+                            // ドリフト補正(同期)の seek 後にも PLAYING が再発火するが、その時は
+                            // 既に再生中なので通知しない。さもないと同期のたびに別窓へ
+                            // 「再生開始」通知が飛び、別窓側が一時停止して「急に止まる」。
+                            if (playing && !this.#isPlaying) {
                                 this.#playChannel?.postMessage({
                                     type: "playing",
                                     id: this.#instanceId,
                                 })
                             }
+                            this.#isPlaying = playing
                             this.#renderUI()
                         }
                         // ENDED → 次のポーリングで advance されるのを待つだけ
@@ -419,6 +432,8 @@ export class AimogeJukeboxElement extends HTMLElement {
                 isPlaying: this.#ytPlayer != null && this.#isPlaying,
                 volume: this.#volume,
                 onVolumeChange: (v: number) => this.#handleVolumeChange(v),
+                // no-player モードでは動画・再生ボタン・音量を描画しない
+                noPlayer: this.#noPlayer,
                 enqueueError: this.#enqueueError,
                 playerId: this.#playerId,
             }),

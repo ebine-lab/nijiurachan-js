@@ -531,4 +531,35 @@ describe("AimogeJukeboxElement", () => {
 
         expect(playerInstance.setVolume).toHaveBeenCalledWith(50)
     })
+
+    it("data-no-player 属性付きならプレイヤーを生成せず、UI（曲名）は表示する", async () => {
+        const stateWithNp = {
+            ...IDLE_STATE,
+            nowPlaying: {
+                id: 1,
+                source: "youtube" as const,
+                mediaId: "abcdefghijk",
+                title: "No Player Song",
+                durationSec: 200,
+                mine: false,
+                myVoted: false,
+                startedAtMs: 1_000_000,
+                isReplay: false,
+            },
+            serverNowMs: 1_000_000,
+        }
+        vi.stubGlobal("fetch", makeStateFetch(stateWithNp))
+
+        const el = document.createElement(TAG)
+        el.setAttribute("data-no-player", "")
+        document.body.appendChild(el)
+        await flushPromises()
+
+        // プレイヤーは生成されない（再生は別窓に委譲）
+        expect(getMockYT().Player).not.toHaveBeenCalled()
+        // 曲名・操作 UI は表示される
+        expect(el.querySelector(".jukebox-now-playing")).not.toBeNull()
+        // 動画マウント先・再生ボタンは描画されない
+        expect(el.querySelector(".jukebox-playpause-btn")).toBeNull()
+    })
 })
