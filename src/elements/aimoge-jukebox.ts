@@ -134,6 +134,8 @@ export class AimogeJukeboxElement extends HTMLElement {
     /** 再生履歴（直近24h）と表示状態。開いたときに /api/history を取得する。 */
     #history: JukeboxHistoryItem[] = []
     #showHistory: boolean = false
+    /** 履歴取得のリクエスト連番。古い応答で最新を上書きしないための識別子。 */
+    #historyReqId: number = 0
     #volume: number = readStoredVolume()
     /** このインスタンス専用の YouTube player mount point id */
     readonly #playerId: string
@@ -427,8 +429,11 @@ export class AimogeJukeboxElement extends HTMLElement {
         this.#showHistory = !this.#showHistory
         this.#renderUI()
         if (!this.#showHistory) return
+        // 連打/遅延応答対策: 最新リクエストの応答だけを反映する（古い応答で上書きしない）。
+        const reqId = ++this.#historyReqId
         try {
             const res = await this.#client?.getHistory()
+            if (reqId !== this.#historyReqId) return
             this.#history = res?.history ?? []
             this.#renderUI()
         } catch {
