@@ -49,6 +49,22 @@ const DEFAULT_BASE_URL = "https://music.nijiurachan.net"
 let instanceCounter = 0
 
 /**
+ * YouTube IFrame Player API をロードする（未ロードのときだけ <script> を一度注入）。
+ * ロード完了で window.YT.Player が使えるようになり、次のポーリングで #syncPlayer が
+ * プレイヤーを生成する。これが無いと window.YT が永遠に undefined で再生されない（画面が真っ黒）。
+ */
+function loadYouTubeIframeApi(): void {
+    if (typeof window === "undefined" || typeof document === "undefined") return
+    if (window.YT?.Player) return
+    const SRC = "https://www.youtube.com/iframe_api"
+    if (document.querySelector(`script[src="${SRC}"]`)) return
+    const tag = document.createElement("script")
+    tag.src = SRC
+    tag.async = true
+    document.head.appendChild(tag)
+}
+
+/**
  * あいもげジュークボックス custom element。
  * `data-api-base` 属性でバックエンドの base URL を指定できる（省略時は DEFAULT_BASE_URL）。
  *
@@ -83,6 +99,9 @@ export class AimogeJukeboxElement extends HTMLElement {
         const baseUrl =
             this.getAttribute("data-api-base")?.trim() || DEFAULT_BASE_URL
         this.#client = createJukeboxClient({ baseUrl })
+
+        // YouTube IFrame API を読み込む（window.YT が無いとプレイヤーが生成されず真っ黒になる）
+        loadYouTubeIframeApi()
 
         // 初回レンダー: プレイヤーマウント先 div を DOM に配置してから同期する
         this.#renderUI()
