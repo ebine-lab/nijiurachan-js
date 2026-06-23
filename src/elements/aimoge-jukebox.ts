@@ -20,6 +20,18 @@ function readStoredVolume(): number {
     }
 }
 
+// タブ/窓をまたいで一意なインスタンス ID（BroadcastChannel の送信元判定用）。
+// #playerId はページ内 counter（各タブで 1 から振り直す）なので別タブと衝突する。別途用意する。
+function makeInstanceId(): string {
+    if (
+        typeof crypto !== "undefined" &&
+        typeof crypto.randomUUID === "function"
+    ) {
+        return crypto.randomUUID()
+    }
+    return `jbx-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
 // ─── YouTube IFrame Player API ambient types ──────────────────────────────────
 interface YTPlayer {
     seekTo(sec: number, allowSeekAhead: boolean): void
@@ -114,6 +126,8 @@ export class AimogeJukeboxElement extends HTMLElement {
     #wantPlay: boolean = false
     /** 複数タブ/別窓での二重再生を防ぐチャンネル（誰かが再生したら他は止める） */
     #playChannel: BroadcastChannel | null = null
+    /** BroadcastChannel 送信元判定用のタブ横断で一意な ID（#playerId は別タブと衝突するため別途） */
+    readonly #instanceId: string = makeInstanceId()
     #volume: number = readStoredVolume()
     /** このインスタンス専用の YouTube player mount point id */
     readonly #playerId: string
@@ -142,7 +156,7 @@ export class AimogeJukeboxElement extends HTMLElement {
                 const msg = ev.data as { type?: string; id?: string }
                 if (
                     msg?.type === "playing" &&
-                    msg.id !== this.#playerId &&
+                    msg.id !== this.#instanceId &&
                     this.#isPlaying
                 ) {
                     this.#wantPlay = false
@@ -286,6 +300,10 @@ export class AimogeJukeboxElement extends HTMLElement {
                             (Date.now() - this.#fetchedAtClientMs) / 1000
                         e.target.seekTo(currentExpected, true)
                         e.target.setVolume(this.#volume)
+                        // 破棄→再生成フロー（曲間でキューが空→新曲、source 遷移など）でも
+                        // ユーザーの再生意図(#wantPlay)を尊重して再開する。
+                        // 初期は #wantPlay=false なので一時停止のまま（自動再生しない）。
+                        if (this.#wantPlay) e.target.playVideo()
                     },
                     onStateChange: (e: { data: number }): void => {
                         const ps = window.YT.PlayerState
@@ -296,7 +314,7 @@ export class AimogeJukeboxElement extends HTMLElement {
                             if (this.#isPlaying) {
                                 this.#playChannel?.postMessage({
                                     type: "playing",
-                                    id: this.#playerId,
+                                    id: this.#instanceId,
                                 })
                             }
                             this.#renderUI()
