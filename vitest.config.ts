@@ -1,7 +1,7 @@
-import { join, resolve } from "node:path"
 import { existsSync } from "node:fs"
-import type { ViteUserConfig } from "vitest/config"
+import { join, resolve } from "node:path"
 import type { Plugin } from "vite"
+import type { ViteUserConfig } from "vitest/config"
 
 // Vite 8 does not resolve the fallback array in package.json "imports" for .tsx files.
 // This plugin ensures #js/<path> maps to src/<path>.ts or src/<path>.tsx.
