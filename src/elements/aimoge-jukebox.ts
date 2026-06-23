@@ -318,14 +318,18 @@ export class AimogeJukeboxElement extends HTMLElement {
                         const ps = window.YT.PlayerState
                         // 再生/一時停止状態を再生ボタンへ反映
                         if (e.data === ps.PLAYING || e.data === ps.PAUSED) {
-                            this.#isPlaying = e.data === ps.PLAYING
-                            // 自分が再生を始めたら、他タブ/別窓に通知して止めさせる
-                            if (this.#isPlaying) {
+                            const playing = e.data === ps.PLAYING
+                            // 「停止/一時停止 → 再生」へ移った時だけ他タブ/別窓へ通知する。
+                            // ドリフト補正(同期)の seek 後にも PLAYING が再発火するが、その時は
+                            // 既に再生中なので通知しない。さもないと同期のたびに別窓へ
+                            // 「再生開始」通知が飛び、別窓側が一時停止して「急に止まる」。
+                            if (playing && !this.#isPlaying) {
                                 this.#playChannel?.postMessage({
                                     type: "playing",
                                     id: this.#instanceId,
                                 })
                             }
+                            this.#isPlaying = playing
                             this.#renderUI()
                         }
                         // ENDED → 次のポーリングで advance されるのを待つだけ
