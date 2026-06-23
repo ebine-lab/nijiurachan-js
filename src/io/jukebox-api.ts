@@ -1,5 +1,5 @@
 // src/io/jukebox-api.ts
-import type { JukeboxState } from "#js/pure/jukebox"
+import type { JukeboxState } from "../pure/jukebox"
 
 export interface JukeboxClientOptions {
     baseUrl: string
