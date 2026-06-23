@@ -87,6 +87,13 @@ function VolumeSlider(props: {
     )
 }
 
+/** source + mediaId から元動画の URL を組み立てる */
+function mediaUrl(source: string, mediaId: string): string {
+    if (source === "youtube") return `https://youtu.be/${mediaId}`
+    if (source === "soundcloud") return `https://soundcloud.com/${mediaId}`
+    return mediaId
+}
+
 /** state.enqueueCooldownRemainingSec を "N分S秒" 形式に変換する */
 function formatCooldown(sec: number): string {
     const minutes = Math.floor(sec / 60)
@@ -186,6 +193,14 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
                 {state?.queue.map((item: JukeboxQueueItem, index: number) => (
                     <li key={`${index}-${item.source}:${item.mediaId}`}>
                         {item.title ?? item.mediaId}
+                        <a
+                            class="jukebox-queue-url"
+                            href={mediaUrl(item.source, item.mediaId)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            {mediaUrl(item.source, item.mediaId)}
+                        </a>
                         <VoteButton
                             trackId={item.id}
                             myVoted={item.myVoted}
