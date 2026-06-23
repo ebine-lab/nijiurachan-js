@@ -87,7 +87,9 @@ function VolumeSlider(props: {
                 type="button"
                 class="jukebox-volume-icon"
                 onClick={() => props.onToggleMute()}
-                aria-label={props.muted ? "ミュート解除" : "ミュート"}
+                // aria-pressed で ON/OFF を伝えるため aria-label は固定にする
+                // （ラベルも状態連動させると支援技術で二重に状態が伝わる）
+                aria-label="ミュート"
                 aria-pressed={props.muted}
             >
                 {props.muted ? "🔇" : "🔊"}
