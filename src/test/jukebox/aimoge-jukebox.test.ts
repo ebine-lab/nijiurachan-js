@@ -7,6 +7,10 @@ interface MockYTPlayer {
     seekTo: ReturnType<typeof vi.fn>
     loadVideoById: ReturnType<typeof vi.fn>
     getCurrentTime: ReturnType<typeof vi.fn>
+    setVolume: ReturnType<typeof vi.fn>
+    getVolume: ReturnType<typeof vi.fn>
+    mute: ReturnType<typeof vi.fn>
+    unMute: ReturnType<typeof vi.fn>
     destroy: ReturnType<typeof vi.fn>
     _readyCallback: ((e: { target: MockYTPlayer }) => void) | undefined
 }
@@ -31,6 +35,10 @@ function makeMockYT(): {
         this.seekTo = vi.fn()
         this.loadVideoById = vi.fn()
         this.getCurrentTime = vi.fn().mockReturnValue(0)
+        this.setVolume = vi.fn()
+        this.getVolume = vi.fn().mockReturnValue(50)
+        this.mute = vi.fn()
+        this.unMute = vi.fn()
         this.destroy = vi.fn()
         this._readyCallback = opts.events?.onReady
         // テストから onReady を手動で発火できるよう lastInstance に保存
@@ -486,5 +494,37 @@ describe("AimogeJukeboxElement", () => {
         expect(playerInstance.seekTo.mock.calls.length).toBe(
             seekCountAfterReady,
         )
+    })
+
+    it("onReady で初期音量（localStorage 未設定なら既定の真ん中=50）が適用される", async () => {
+        // localStorage があればキーを消して順序非依存にする（テスト環境では undefined なので no-op）
+        if (typeof localStorage !== "undefined")
+            localStorage.removeItem("aimoge_jukebox_volume")
+        const stateWithNp = {
+            ...IDLE_STATE,
+            nowPlaying: {
+                id: 1,
+                source: "youtube" as const,
+                mediaId: "abcdefghijk",
+                title: "Vol Song",
+                durationSec: 300,
+                mine: false,
+                myVoted: false,
+                startedAtMs: 1_000_000,
+                isReplay: false,
+            },
+            serverNowMs: 1_000_000,
+        }
+        vi.stubGlobal("fetch", makeStateFetch(stateWithNp))
+
+        mount()
+        await flushPromises()
+
+        const playerInstance = getMockYT().Player._lastInstance
+        if (!playerInstance) throw new Error("YT.Player not constructed")
+
+        playerInstance._readyCallback?.({ target: playerInstance })
+
+        expect(playerInstance.setVolume).toHaveBeenCalledWith(50)
     })
 })

@@ -5,6 +5,21 @@ import { createJukeboxClient } from "../io/jukebox-api"
 import type { JukeboxState } from "../pure/jukebox"
 import { parseJukeboxUrl, playbackOffsetSec } from "../pure/jukebox"
 
+// 音量(0-100)は localStorage に永続化する。初期値は真ん中(50)。
+const VOLUME_STORAGE_KEY = "aimoge_jukebox_volume"
+const DEFAULT_VOLUME = 50
+function readStoredVolume(): number {
+    try {
+        if (typeof localStorage === "undefined") return DEFAULT_VOLUME
+        const raw = localStorage.getItem(VOLUME_STORAGE_KEY)
+        const n = raw == null ? Number.NaN : Number(raw)
+        return Number.isFinite(n) && n >= 0 && n <= 100 ? n : DEFAULT_VOLUME
+    } catch {
+        // プライベートブラウジング / SecurityError 等で getItem が投げる環境 → 既定値
+        return DEFAULT_VOLUME
+    }
+}
+
 // ─── YouTube IFrame Player API ambient types ──────────────────────────────────
 interface YTPlayer {
     seekTo(sec: number, allowSeekAhead: boolean): void
@@ -12,6 +27,10 @@ interface YTPlayer {
     getCurrentTime(): number
     playVideo(): void
     pauseVideo(): void
+    setVolume(volume: number): void
+    getVolume(): number
+    mute(): void
+    unMute(): void
     destroy(): void
 }
 
@@ -89,6 +108,7 @@ export class AimogeJukeboxElement extends HTMLElement {
     #fetchedAtClientMs: number = 0
     /** YT プレイヤーが再生中か（onStateChange で更新し、再生/一時停止ボタンに反映） */
     #isPlaying: boolean = false
+    #volume: number = readStoredVolume()
     /** このインスタンス専用の YouTube player mount point id */
     readonly #playerId: string
 
@@ -235,6 +255,7 @@ export class AimogeJukeboxElement extends HTMLElement {
                             ) +
                             (Date.now() - this.#fetchedAtClientMs) / 1000
                         e.target.seekTo(currentExpected, true)
+                        e.target.setVolume(this.#volume)
                     },
                     onStateChange: (e: { data: number }): void => {
                         const ps = window.YT.PlayerState
@@ -269,9 +290,9 @@ export class AimogeJukeboxElement extends HTMLElement {
             // 即座に state を再取得してキューを更新
             void this.#pollState()
         } catch (e) {
-            const status = (e as { status?: number }).status ?? 0
-            // enqueueErrorMessage: 403/409/415/429 → 日本語メッセージ
-            this.#enqueueError = enqueueErrorMessage(status)
+            const err = e as { status?: number; code?: string | null }
+            // enqueueErrorMessage: code(duration_too_long 等) 優先 → 403/409/415/429
+            this.#enqueueError = enqueueErrorMessage(err.status ?? 0, err.code)
             this.#renderUI()
         }
     }
@@ -306,6 +327,20 @@ export class AimogeJukeboxElement extends HTMLElement {
         }
     }
 
+    /** 音量(0-100)変更。プレイヤーへ即反映し localStorage に永続化する。
+     *  スライダー側がローカル state を持つため #renderUI は呼ばない（ドラッグ毎の全再描画回避）。 */
+    #handleVolumeChange(volume: number): void {
+        this.#volume = volume
+        this.#ytPlayer?.setVolume(volume)
+        try {
+            if (typeof localStorage !== "undefined") {
+                localStorage.setItem(VOLUME_STORAGE_KEY, String(volume))
+            }
+        } catch {
+            // 保存不可環境（プライベートブラウジング / SecurityError 等）は無視
+        }
+    }
+
     #renderUI(): void {
         render(
             h(JukeboxUI, {
@@ -316,6 +351,8 @@ export class AimogeJukeboxElement extends HTMLElement {
                 onTogglePlay: () => this.#handleTogglePlay(),
                 // プレイヤー未生成/破棄後は再生中表示を残さない
                 isPlaying: this.#ytPlayer != null && this.#isPlaying,
+                volume: this.#volume,
+                onVolumeChange: (v: number) => this.#handleVolumeChange(v),
                 enqueueError: this.#enqueueError,
                 playerId: this.#playerId,
             }),

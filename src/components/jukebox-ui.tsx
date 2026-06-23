@@ -13,6 +13,10 @@ export interface JukeboxUIProps {
     onTogglePlay: () => void
     /** YT プレイヤーが再生中か（ボタン表示の切替に使う） */
     isPlaying: boolean
+    /** 現在の音量(0-100)。スライダーの初期値に使う */
+    volume: number
+    /** 音量(0-100)の変更ハンドラ */
+    onVolumeChange: (volume: number) => void
     enqueueError: string | null
     /** YouTube プレイヤーをマウントする div の id。インスタンスごとに一意にする */
     playerId: string
@@ -52,6 +56,35 @@ function VoteButton(props: {
     )
 }
 
+/** 音量スライダー(0-100)。ドラッグ中の全体再描画を避けるためローカル state を持つ。 */
+function VolumeSlider(props: {
+    volume: number
+    onVolumeChange: (volume: number) => void
+}): VNode {
+    const [vol, setVol] = useState(props.volume)
+    return (
+        <label class="jukebox-volume">
+            <span class="jukebox-volume-icon" aria-hidden="true">
+                🔊
+            </span>
+            <input
+                type="range"
+                class="jukebox-volume-range"
+                min={0}
+                max={100}
+                step={1}
+                value={vol}
+                aria-label="音量"
+                onInput={(e: Event) => {
+                    const v = Number((e.target as HTMLInputElement).value)
+                    setVol(v)
+                    props.onVolumeChange(v)
+                }}
+            />
+        </label>
+    )
+}
+
 /** state.enqueueCooldownRemainingSec を "N分S秒" 形式に変換する */
 function formatCooldown(sec: number): string {
     const minutes = Math.floor(sec / 60)
@@ -67,6 +100,8 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
         onCancelMine,
         onTogglePlay,
         isPlaying,
+        volume,
+        onVolumeChange,
         enqueueError,
         playerId,
     } = props
@@ -133,6 +168,7 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
                 >
                     {isPlaying ? "⏸ 一時停止" : "▶ 再生"}
                 </button>
+                <VolumeSlider volume={volume} onVolumeChange={onVolumeChange} />
             </div>
 
             <ul class="jukebox-queue">
@@ -164,7 +200,7 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
                 <input
                     type="url"
                     value={urlInput}
-                    placeholder="YouTube または SoundCloud の URL を入力"
+                    placeholder="(YouTube/SoundCloud URL 10分未満)"
                     onInput={(e) =>
                         setUrlInput((e.target as HTMLInputElement).value)
                     }
@@ -192,8 +228,12 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
     )
 }
 
-/** HttpError.status を日本語メッセージに変換する（enqueue 用） */
-export function enqueueErrorMessage(status: number): string {
+/** HttpError(status, code) を日本語メッセージに変換する（enqueue 用） */
+export function enqueueErrorMessage(
+    status: number,
+    code?: string | null,
+): string {
+    if (code === "duration_too_long") return "10分未満の動画のみ追加できます"
     if (status === 403) return "追加は書き込んだユーザーのみ可能です"
     if (status === 409) return "既に1曲追加済みです（再生後にまた追加できます）"
     if (status === 415) return "対応していない URL です"

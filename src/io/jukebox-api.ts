@@ -7,14 +7,25 @@ export interface JukeboxClientOptions {
 
 export class HttpError extends Error {
     status: number
-    constructor(status: number) {
+    /** レスポンス body の `error` コード（あれば）。status だけでは区別できない 400 の細分に使う。 */
+    code: string | null
+    constructor(status: number, code: string | null = null) {
         super(`HTTP ${status}`)
         this.status = status
+        this.code = code
     }
 }
 
 async function throwIfNotOk(res: Response): Promise<void> {
-    if (!res.ok) throw new HttpError(res.status)
+    if (res.ok) return
+    let code: string | null = null
+    try {
+        const body = (await res.json()) as { error?: string }
+        code = body?.error ?? null
+    } catch {
+        // body が JSON でない/空のときは code なし
+    }
+    throw new HttpError(res.status, code)
 }
 
 /** POST /api/skip/vote のレスポンス。voted=投票が記録された / removed=閾値超過で除外・スキップされた */
