@@ -10,6 +10,8 @@ interface YTPlayer {
     seekTo(sec: number, allowSeekAhead: boolean): void
     loadVideoById(videoId: string, startSeconds?: number): void
     getCurrentTime(): number
+    playVideo(): void
+    pauseVideo(): void
     destroy(): void
 }
 
@@ -31,7 +33,7 @@ declare global {
                     }
                 },
             ) => YTPlayer
-            PlayerState: { ENDED: number }
+            PlayerState: { ENDED: number; PLAYING: number; PAUSED: number }
         }
         onYouTubeIframeAPIReady?: () => void
     }
@@ -63,6 +65,8 @@ export class AimogeJukeboxElement extends HTMLElement {
     #ytPlayer: YTPlayer | null = null
     #currentMediaId: string | null = null
     #fetchedAtClientMs: number = 0
+    /** YT プレイヤーが再生中か（onStateChange で更新し、再生/一時停止ボタンに反映） */
+    #isPlaying: boolean = false
     /** このインスタンス専用の YouTube player mount point id */
     readonly #playerId: string
 
@@ -208,8 +212,15 @@ export class AimogeJukeboxElement extends HTMLElement {
                         e.target.seekTo(currentExpected, true)
                     },
                     onStateChange: (e: { data: number }): void => {
+                        const ps = window.YT.PlayerState
+                        // 再生/一時停止状態を再生ボタンへ反映
+                        if (e.data === ps.PLAYING || e.data === ps.PAUSED) {
+                            this.#isPlaying = e.data === ps.PLAYING
+                            this.#renderUI()
+                        }
                         // ENDED → 次のポーリングで advance されるのを待つだけ
-                        if (e.data === window.YT.PlayerState.ENDED) {
+                        if (e.data === ps.ENDED) {
+                            this.#isPlaying = false
                             void this.#pollState()
                         }
                     },
@@ -258,6 +269,18 @@ export class AimogeJukeboxElement extends HTMLElement {
         }
     }
 
+    /** 再生/一時停止ボタンのハンドラ。YT プレイヤーを直接トグルする。
+     *  #syncPlayer は seekTo のみで再生を強制しないため、手動 pause は次の曲まで保持され、
+     *  再生再開時に live 位置へ再同期される。 */
+    #handleTogglePlay(): void {
+        if (!this.#ytPlayer) return
+        if (this.#isPlaying) {
+            this.#ytPlayer.pauseVideo()
+        } else {
+            this.#ytPlayer.playVideo()
+        }
+    }
+
     #renderUI(): void {
         render(
             h(JukeboxUI, {
@@ -265,6 +288,8 @@ export class AimogeJukeboxElement extends HTMLElement {
                 onEnqueue: (url: string) => this.#handleEnqueue(url),
                 onSkipVote: () => this.#handleSkipVote(),
                 onCancelMine: () => this.#handleCancelMine(),
+                onTogglePlay: () => this.#handleTogglePlay(),
+                isPlaying: this.#isPlaying,
                 enqueueError: this.#enqueueError,
                 playerId: this.#playerId,
             }),
