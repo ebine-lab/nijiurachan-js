@@ -21,6 +21,10 @@ export interface JukeboxUIProps {
     volume: number
     /** 音量(0-100)の変更ハンドラ */
     onVolumeChange: (volume: number) => void
+    /** ミュート中か（スピーカーアイコンの表示切替に使う） */
+    muted: boolean
+    /** ミュート/解除のトグル（スピーカーアイコン押下） */
+    onToggleMute: () => void
     /** true のとき動画・再生ボタン・音量を描画しない（再生は別窓に委譲する本窓用） */
     noPlayer?: boolean
     /** 再生履歴（直近24h）。showHistory が true のときに表示する */
@@ -68,17 +72,26 @@ function VoteButton(props: {
     )
 }
 
-/** 音量スライダー(0-100)。ドラッグ中の全体再描画を避けるためローカル state を持つ。 */
+/** 音量スライダー(0-100)。ドラッグ中の全体再描画を避けるためローカル state を持つ。
+ *  スピーカーアイコンはボタンで、押すとミュート/解除をトグルする。 */
 function VolumeSlider(props: {
     volume: number
     onVolumeChange: (volume: number) => void
+    muted: boolean
+    onToggleMute: () => void
 }): VNode {
     const [vol, setVol] = useState(props.volume)
     return (
-        <label class="jukebox-volume">
-            <span class="jukebox-volume-icon" aria-hidden="true">
-                🔊
-            </span>
+        <div class="jukebox-volume">
+            <button
+                type="button"
+                class="jukebox-volume-icon"
+                onClick={() => props.onToggleMute()}
+                aria-label={props.muted ? "ミュート解除" : "ミュート"}
+                aria-pressed={props.muted}
+            >
+                {props.muted ? "🔇" : "🔊"}
+            </button>
             <input
                 type="range"
                 class="jukebox-volume-range"
@@ -93,7 +106,7 @@ function VolumeSlider(props: {
                     props.onVolumeChange(v)
                 }}
             />
-        </label>
+        </div>
     )
 }
 
@@ -120,6 +133,8 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
         isPlaying,
         volume,
         onVolumeChange,
+        muted,
+        onToggleMute,
         noPlayer,
         history,
         showHistory,
@@ -196,6 +211,8 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
                         <VolumeSlider
                             volume={volume}
                             onVolumeChange={onVolumeChange}
+                            muted={muted}
+                            onToggleMute={onToggleMute}
                         />
                     </div>
                 </>
