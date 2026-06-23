@@ -1,7 +1,11 @@
 /** @jsxImportSource preact */
 import type { VNode } from "preact"
 import { useState } from "preact/hooks"
-import type { JukeboxQueueItem, JukeboxState } from "../pure/jukebox"
+import type {
+    JukeboxHistoryItem,
+    JukeboxQueueItem,
+    JukeboxState,
+} from "../pure/jukebox"
 
 export interface JukeboxUIProps {
     state: JukeboxState | null
@@ -19,6 +23,12 @@ export interface JukeboxUIProps {
     onVolumeChange: (volume: number) => void
     /** true のとき動画・再生ボタン・音量を描画しない（再生は別窓に委譲する本窓用） */
     noPlayer?: boolean
+    /** 再生履歴（直近24h）。showHistory が true のときに表示する */
+    history: JukeboxHistoryItem[]
+    /** 履歴パネルを開いているか */
+    showHistory: boolean
+    /** 履歴パネルの開閉（開いたときに親が履歴を取得する） */
+    onToggleHistory: () => void
     enqueueError: string | null
     /** YouTube プレイヤーをマウントする div の id。インスタンスごとに一意にする */
     playerId: string
@@ -111,6 +121,9 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
         volume,
         onVolumeChange,
         noPlayer,
+        history,
+        showHistory,
+        onToggleHistory,
         enqueueError,
         playerId,
     } = props
@@ -250,6 +263,40 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
                 <div class="jukebox-error" role="alert">
                     {enqueueError}
                 </div>
+            )}
+
+            <button
+                type="button"
+                class="jukebox-history-toggle"
+                onClick={() => onToggleHistory()}
+                aria-expanded={showHistory}
+            >
+                {showHistory ? "▼ 再生履歴を隠す" : "▶ 再生履歴（24時間）"}
+            </button>
+            {showHistory && (
+                <ul class="jukebox-history">
+                    {history.length === 0 ? (
+                        <li class="jukebox-history-empty">
+                            まだ履歴がありません
+                        </li>
+                    ) : (
+                        history.map((h: JukeboxHistoryItem, index: number) => (
+                            <li key={`${index}-${h.id}`}>
+                                {h.title ?? h.mediaId}
+                                {h.source === "youtube" && (
+                                    <a
+                                        class="jukebox-queue-url"
+                                        href={youtubeWatchUrl(h.mediaId)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        {youtubeWatchUrl(h.mediaId)}
+                                    </a>
+                                )}
+                            </li>
+                        ))
+                    )}
+                </ul>
             )}
         </div>
     )

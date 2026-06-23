@@ -562,4 +562,55 @@ describe("AimogeJukeboxElement", () => {
         // 動画マウント先・再生ボタンは描画されない
         expect(el.querySelector(".jukebox-playpause-btn")).toBeNull()
     })
+
+    it("履歴トグルで /api/history を取得して表示する", async () => {
+        const now = 1_000_000
+        vi.stubGlobal(
+            "fetch",
+            vi.fn((url: string) => {
+                const u = String(url)
+                if (u.includes("/api/history")) {
+                    return Promise.resolve(
+                        new Response(
+                            JSON.stringify({
+                                history: [
+                                    {
+                                        id: 9,
+                                        source: "youtube",
+                                        mediaId: "histabc1234",
+                                        title: "Played Song",
+                                        durationSec: 100,
+                                        endedAtMs: now - 1000,
+                                    },
+                                ],
+                                serverNowMs: now,
+                            }),
+                            { status: 200 },
+                        ),
+                    )
+                }
+                if (u.includes("/api/presence")) {
+                    return Promise.resolve(
+                        new Response(JSON.stringify({ ok: true }), {
+                            status: 200,
+                        }),
+                    )
+                }
+                return Promise.resolve(
+                    new Response(JSON.stringify(IDLE_STATE), { status: 200 }),
+                )
+            }),
+        )
+        const el = mount()
+        await flushPromises()
+        // 初期は履歴は非表示
+        expect(el.querySelector(".jukebox-history")).toBeNull()
+        // トグルを押すと /api/history を取得して表示
+        ;(
+            el.querySelector(".jukebox-history-toggle") as HTMLElement | null
+        )?.click()
+        await flushPromises()
+        expect(el.querySelector(".jukebox-history")).not.toBeNull()
+        expect(el.textContent).toContain("Played Song")
+    })
 })

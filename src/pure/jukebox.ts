@@ -28,6 +28,21 @@ export interface JukeboxState {
     enqueueCooldownRemainingSec: number
 }
 
+/** 再生履歴の1曲（直近24h、再生し終えた曲）。 */
+export interface JukeboxHistoryItem {
+    id: number
+    source: JukeboxSource
+    mediaId: string
+    title: string | null
+    durationSec: number
+    endedAtMs: number
+}
+
+export interface JukeboxHistory {
+    history: JukeboxHistoryItem[]
+    serverNowMs: number
+}
+
 export interface ParsedJukeboxMedia {
     source: JukeboxSource
     mediaId: string
