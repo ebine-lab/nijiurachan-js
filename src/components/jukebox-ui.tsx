@@ -268,7 +268,7 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
                 {state?.queue.map((item: JukeboxQueueItem, index: number) => {
                     const etaMs = queueEtas[index]
                     return (
-                        <li key={`${index}-${item.source}:${item.mediaId}`}>
+                        <li key={item.id}>
                             {item.title ?? item.mediaId}
                             {etaMs != null && (
                                 <span class="jukebox-queue-eta">
@@ -348,8 +348,8 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
                             まだ履歴がありません
                         </li>
                     ) : (
-                        history.map((h: JukeboxHistoryItem, index: number) => (
-                            <li key={`${index}-${h.id}`}>
+                        history.map((h: JukeboxHistoryItem) => (
+                            <li key={h.id}>
                                 <span class="jukebox-history-time">
                                     {formatClockTime(h.startedAtMs)} 開始
                                 </span>

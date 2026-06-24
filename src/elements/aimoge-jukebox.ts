@@ -137,6 +137,10 @@ export class AimogeJukeboxElement extends HTMLElement {
      *  3秒ポーリング待ちだと起動が遅れて前方スキップするため、started_at に正確に合わせる。
      *  曲変更/破棄/一時停止で必ずクリアする。 */
     #startTimer: ReturnType<typeof setTimeout> | null = null
+    /** 現在「開始待ち」のために arm している started_at_ms。同一 mediaId のまま started_at が
+     *  新しい未来値に変わった場合（同じ曲の連続予約など）の張り直し判定に使い、毎ポーリングでの
+     *  タイマー再設定（churn）を防ぐ。 */
+    #armedStartedAtMs: number | null = null
     /** 複数タブ/別窓での二重再生を防ぐチャンネル（誰かが再生したら他は止める） */
     #playChannel: BroadcastChannel | null = null
     /** BroadcastChannel 送信元判定用のタブ横断で一意な ID（#playerId は別タブと衝突するため別途） */
@@ -307,6 +311,7 @@ export class AimogeJukeboxElement extends HTMLElement {
             if (this.#ytPlayer) {
                 this.#clearStartTimer()
                 this.#awaitingServerStart = false
+                this.#armedStartedAtMs = null
                 this.#ytPlayer.destroy()
                 this.#ytPlayer = null
                 this.#currentMediaId = null
@@ -328,11 +333,27 @@ export class AimogeJukeboxElement extends HTMLElement {
 
         if (this.#currentMediaId === np.mediaId && this.#ytPlayer) {
             // 同じ曲。
-            // サーバー開始前は 0 で待機。先行再生中の player を巻き戻さない（SP と同挙動）。
-            if (startInFuture) return
+            if (startInFuture) {
+                // サーバー開始前は 0 で待機（先行再生中の player を巻き戻さない＝SP と同挙動）。
+                // 同一 mediaId のまま started_at が新しい未来値に変わった場合（同じ曲を連続予約等）は
+                // 開始待ちを張り直す。armed と一致していれば張りっぱなしで churn を防ぐ。
+                if (this.#armedStartedAtMs !== np.startedAtMs) {
+                    this.#armedStartedAtMs = np.startedAtMs
+                    this.#awaitingServerStart = this.#wantPlay
+                    this.#clearStartTimer()
+                    if (this.#wantPlay) {
+                        this.#ytPlayer.seekTo(0, true)
+                        this.#scheduleServerStart(
+                            np.startedAtMs - projectedNowMs,
+                        )
+                    }
+                }
+                return
+            }
             // 開始時刻に到達: 未来ウィンドウ中に cue で待たせていた曲をここで一度だけ再生開始
             // （タイマーが先に発火していれば #awaitingServerStart は既に false でスキップ）。
             // 待機フラグが立っている時だけ＝ネイティブ一時停止(後述で wantPlay=false)とは競合しない。
+            this.#armedStartedAtMs = null
             if (this.#awaitingServerStart) {
                 this.#awaitingServerStart = false
                 this.#clearStartTimer()
@@ -356,6 +377,7 @@ export class AimogeJukeboxElement extends HTMLElement {
         // サーバー開始前に cue した場合は #awaitingServerStart を立て、started_at ちょうどに
         // タイマーで自動再生する（ポーリング待ちより正確）。曲が変わるので既存タイマーは破棄。
         this.#awaitingServerStart = this.#wantPlay && startInFuture
+        this.#armedStartedAtMs = startInFuture ? np.startedAtMs : null
         this.#clearStartTimer()
         if (this.#awaitingServerStart) {
             this.#scheduleServerStart(np.startedAtMs - projectedNowMs)

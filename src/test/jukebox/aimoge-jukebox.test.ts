@@ -604,6 +604,35 @@ describe("AimogeJukeboxElement", () => {
         expect(player.playVideo).not.toHaveBeenCalled()
     })
 
+    it("同一 mediaId の次トラックが未来開始でも開始待ちを張り直して自動再生する (P1)", async () => {
+        const { player } = await mountPlayingThenPressPlay() // mediaId "pastsong0000" 再生中
+        player.playVideo.mockClear()
+
+        // 別 id だが「同じ mediaId」の次トラックが started_at 未来(+4s)で届く（同じ曲を連続予約等）
+        const t1 = 1_000_000 + 3_000
+        const sameMediaFuture = {
+            ...IDLE_STATE,
+            serverNowMs: t1,
+            nowPlaying: {
+                id: 2,
+                source: "youtube" as const,
+                mediaId: "pastsong0000", // ★ 現在と同一 mediaId
+                title: "Same Song (replay)",
+                durationSec: 300,
+                mine: false,
+                myVoted: false,
+                startedAtMs: t1 + 4_000,
+                isReplay: false,
+            },
+        }
+        vi.stubGlobal("fetch", makeStateFetch(sameMediaFuture))
+        await vi.advanceTimersByTimeAsync(3000) // 同曲分岐で再 arm（早期 return せずタイマー予約）
+        expect(player.playVideo).not.toHaveBeenCalled() // 未来中はまだ鳴らさない
+
+        await vi.advanceTimersByTimeAsync(4000) // started_at 到達 → 張り直したタイマーで自動再生
+        expect(player.playVideo).toHaveBeenCalledTimes(1)
+    })
+
     it("enqueue エラーは即座には消えず ~12秒で自動クリアされる", async () => {
         vi.stubGlobal("fetch", makeStateFetch())
         const el = mount()
