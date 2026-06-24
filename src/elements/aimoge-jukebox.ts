@@ -75,6 +75,9 @@ declare global {
 const STATE_INTERVAL_MS = 3_000
 const PRESENCE_INTERVAL_MS = 10_000
 const DRIFT_THRESHOLD_SEC = 2
+// enqueue エラー文の自動消滅までの時間。読み切れる長さは残しつつ、
+// クールダウン(30分)明けまで残って「追加可能なのにエラー表示」になる矛盾を防ぐ。
+const ENQUEUE_ERROR_TTL_MS = 12_000
 const DEFAULT_BASE_URL = "https://music.nijiurachan.net"
 
 /** インスタンスごとに一意な player element id を生成するカウンタ */
@@ -116,6 +119,8 @@ export class AimogeJukeboxElement extends HTMLElement {
     #abortController: AbortController | null = null
     #state: JukeboxState | null = null
     #enqueueError: string | null = null
+    /** #enqueueError をセットした時刻(ms)。ENQUEUE_ERROR_TTL_MS 経過で #pollState が自動クリアする。 */
+    #enqueueErrorAtMs: number = 0
     #ytPlayer: YTPlayer | null = null
     #currentMediaId: string | null = null
     #fetchedAtClientMs: number = 0
@@ -124,6 +129,18 @@ export class AimogeJukeboxElement extends HTMLElement {
     /** ユーザーが再生を望んでいるか。デフォルトは false＝一時停止（自動再生しない）。
      *  曲が server 側で進んでも、これが false の間は cue のみで音を出さない。 */
     #wantPlay: boolean = false
+    /** 新曲の started_at_ms がまだ未来（ロードラグ吸収ウィンドウ）で、cue したまま
+     *  サーバー開始時刻の到達を待っている状態。到達時に一度だけ自動再生する。
+     *  これが true の間はドリフト補正で巻き戻さない（先頭スキップ防止と巻き戻し防止の両立）。 */
+    #awaitingServerStart: boolean = false
+    /** サーバー開始時刻ちょうどに先頭(0)から再生開始するワンショットタイマー。
+     *  3秒ポーリング待ちだと起動が遅れて前方スキップするため、started_at に正確に合わせる。
+     *  曲変更/破棄/一時停止で必ずクリアする。 */
+    #startTimer: ReturnType<typeof setTimeout> | null = null
+    /** 現在「開始待ち」のために arm している started_at_ms。同一 mediaId のまま started_at が
+     *  新しい未来値に変わった場合（同じ曲の連続予約など）の張り直し判定に使い、毎ポーリングでの
+     *  タイマー再設定（churn）を防ぐ。 */
+    #armedStartedAtMs: number | null = null
     /** 複数タブ/別窓での二重再生を防ぐチャンネル（誰かが再生したら他は止める） */
     #playChannel: BroadcastChannel | null = null
     /** BroadcastChannel 送信元判定用のタブ横断で一意な ID（#playerId は別タブと衝突するため別途） */
@@ -201,6 +218,7 @@ export class AimogeJukeboxElement extends HTMLElement {
             clearInterval(this.#presenceTimer)
             this.#presenceTimer = null
         }
+        this.#clearStartTimer()
         this.#abortController?.abort()
         this.#abortController = null
         this.#playChannel?.close()
@@ -225,7 +243,15 @@ export class AimogeJukeboxElement extends HTMLElement {
             if (controller.signal.aborted) return
             this.#fetchedAtClientMs = fetchedAt
             this.#state = state ?? null
-            this.#enqueueError = null
+            // enqueue エラーは即座には消さず（3秒ポーリングで消えると読めない）、
+            // ENQUEUE_ERROR_TTL_MS 経過で自動クリアする。これで「クールダウン明けに
+            // 追加可能なのにエラーが残る」矛盾を防ぎつつ、読み切れる時間は確保する。
+            if (
+                this.#enqueueError !== null &&
+                fetchedAt - this.#enqueueErrorAtMs > ENQUEUE_ERROR_TTL_MS
+            ) {
+                this.#enqueueError = null
+            }
             // UI を先にレンダーして player mount point を DOM に確実に存在させる
             this.#renderUI()
             if (state != null) {
@@ -252,12 +278,40 @@ export class AimogeJukeboxElement extends HTMLElement {
         }
     }
 
+    /** サーバー開始待ちタイマーを解除する（曲変更・破棄・一時停止時に必ず呼ぶ）。 */
+    #clearStartTimer(): void {
+        if (this.#startTimer !== null) {
+            clearTimeout(this.#startTimer)
+            this.#startTimer = null
+        }
+    }
+
+    /** delayMs 後（＝サーバー開始時刻ちょうど）に先頭(0)から再生開始するタイマーを張る。
+     *  ポーリング(3秒)待ちより正確に起動でき、暖機経路の前方スキップを防ぐ。
+     *  fallback として #syncPlayer の同曲分岐(#awaitingServerStart)も残す（タイマーが
+     *  バックグラウンドタブ等で抑制された場合の保険）。 */
+    #scheduleServerStart(delayMs: number): void {
+        this.#clearStartTimer()
+        if (delayMs <= 0) return
+        this.#startTimer = setTimeout(() => {
+            this.#startTimer = null
+            if (this.#awaitingServerStart && this.#wantPlay && this.#ytPlayer) {
+                this.#awaitingServerStart = false
+                this.#ytPlayer.seekTo(0, true)
+                this.#ytPlayer.playVideo()
+            }
+        }, delayMs)
+    }
+
     #syncPlayer(state: JukeboxState): void {
         // no-player モードはプレイヤーを一切持たない（再生は別窓に委譲）
         if (this.#noPlayer) return
         const np = state.nowPlaying
         if (!np || np.source !== "youtube") {
             if (this.#ytPlayer) {
+                this.#clearStartTimer()
+                this.#awaitingServerStart = false
+                this.#armedStartedAtMs = null
                 this.#ytPlayer.destroy()
                 this.#ytPlayer = null
                 this.#currentMediaId = null
@@ -269,34 +323,67 @@ export class AimogeJukeboxElement extends HTMLElement {
         if (typeof window.YT?.Player !== "function") return
 
         const clientElapsedMs = Date.now() - this.#fetchedAtClientMs
-        const serverOffsetSec = playbackOffsetSec(
-            np.startedAtMs,
-            state.serverNowMs,
-        )
-        const expectedSec = serverOffsetSec + clientElapsedMs / 1000
+        // 投影した現在時刻（serverNow + 取得後の経過）でクランプして期待位置を出す。
+        // started_at_ms が未来（曲送り直後のロードラグ吸収ぶん）の間は 0 に張り付くので、
+        // 新曲は先頭(0)から始まり、サーバー開始時刻に達すると実時間に追従する。
+        const projectedNowMs = state.serverNowMs + clientElapsedMs
+        const expectedSec = playbackOffsetSec(np.startedAtMs, projectedNowMs)
+        // サーバー上で再生がまだ始まっていない（started_at_ms が未来）か。
+        const startInFuture = projectedNowMs < np.startedAtMs
 
         if (this.#currentMediaId === np.mediaId && this.#ytPlayer) {
-            // 同じ曲: ドリフト補正
+            // 同じ曲。
+            if (startInFuture) {
+                // サーバー開始前は 0 で待機（先行再生中の player を巻き戻さない＝SP と同挙動）。
+                // 同一 mediaId のまま started_at が新しい未来値に変わった場合（同じ曲を連続予約等）は
+                // 開始待ちを張り直す。armed と一致していれば張りっぱなしで churn を防ぐ。
+                if (this.#armedStartedAtMs !== np.startedAtMs) {
+                    this.#armedStartedAtMs = np.startedAtMs
+                    this.#awaitingServerStart = this.#wantPlay
+                    this.#clearStartTimer()
+                    if (this.#wantPlay) {
+                        this.#ytPlayer.seekTo(0, true)
+                        this.#scheduleServerStart(
+                            np.startedAtMs - projectedNowMs,
+                        )
+                    }
+                }
+                return
+            }
+            // 開始時刻に到達: 未来ウィンドウ中に cue で待たせていた曲をここで一度だけ再生開始
+            // （タイマーが先に発火していれば #awaitingServerStart は既に false でスキップ）。
+            // 待機フラグが立っている時だけ＝ネイティブ一時停止(後述で wantPlay=false)とは競合しない。
+            this.#armedStartedAtMs = null
+            if (this.#awaitingServerStart) {
+                this.#awaitingServerStart = false
+                this.#clearStartTimer()
+                if (this.#wantPlay) this.#ytPlayer.playVideo()
+            }
+            // ドリフト補正（クランプ済み期待位置で比較）
             const localPositionSec =
                 typeof this.#ytPlayer?.getCurrentTime === "function"
                     ? (this.#ytPlayer.getCurrentTime() ?? 0)
                     : 0
-            const expectedOffsetSec =
-                playbackOffsetSec(np.startedAtMs, state.serverNowMs) +
-                (Date.now() - this.#fetchedAtClientMs) / 1000
             if (
-                Math.abs(localPositionSec - expectedOffsetSec) >
-                DRIFT_THRESHOLD_SEC
+                Math.abs(localPositionSec - expectedSec) > DRIFT_THRESHOLD_SEC
             ) {
-                this.#ytPlayer.seekTo(expectedOffsetSec, true)
+                this.#ytPlayer.seekTo(expectedSec, true)
             }
             return
         }
 
         // 新しい曲: プレイヤーを生成/差し替え。
-        // ユーザーが再生中(#wantPlay)なら load で続けて再生、未再生なら cue で音を出さない。
+        // 再生希望かつサーバー開始済みなら load で再生、未再生 or サーバー開始前は cue で音を出さない。
+        // サーバー開始前に cue した場合は #awaitingServerStart を立て、started_at ちょうどに
+        // タイマーで自動再生する（ポーリング待ちより正確）。曲が変わるので既存タイマーは破棄。
+        this.#awaitingServerStart = this.#wantPlay && startInFuture
+        this.#armedStartedAtMs = startInFuture ? np.startedAtMs : null
+        this.#clearStartTimer()
+        if (this.#awaitingServerStart) {
+            this.#scheduleServerStart(np.startedAtMs - projectedNowMs)
+        }
         if (this.#ytPlayer) {
-            if (this.#wantPlay) {
+            if (this.#wantPlay && !startInFuture) {
                 this.#ytPlayer.loadVideoById(np.mediaId, expectedSec)
             } else {
                 this.#ytPlayer.cueVideoById(np.mediaId, expectedSec)
@@ -308,20 +395,29 @@ export class AimogeJukeboxElement extends HTMLElement {
                 playerVars: { autoplay: 0, controls: 1 },
                 events: {
                     onReady: (e: YTPlayerEvent): void => {
-                        const currentExpected =
-                            playbackOffsetSec(
-                                np.startedAtMs,
-                                state.serverNowMs,
-                            ) +
-                            (Date.now() - this.#fetchedAtClientMs) / 1000
+                        // onReady 時点で投影現在時刻を取り直してクランプ（未来開始ぶんは0）
+                        const readyProjectedMs =
+                            state.serverNowMs +
+                            (Date.now() - this.#fetchedAtClientMs)
+                        const currentExpected = playbackOffsetSec(
+                            np.startedAtMs,
+                            readyProjectedMs,
+                        )
                         e.target.seekTo(currentExpected, true)
                         e.target.setVolume(this.#volume)
                         // player 再生成（曲間など）でもミュート状態を引き継ぐ
                         if (this.#muted) e.target.mute()
-                        // 破棄→再生成フロー（曲間でキューが空→新曲、source 遷移など）でも
-                        // ユーザーの再生意図(#wantPlay)を尊重して再開する。
+                        // ユーザーの再生意図(#wantPlay)を尊重して再開する。ただしサーバー開始前
+                        // （started_at_ms が未来）は鳴らさず cue のまま待つ。到達時に同じ曲の
+                        // ポーリング分岐(#awaitingServerStart)が自動再生する。
                         // 初期は #wantPlay=false なので一時停止のまま（自動再生しない）。
-                        if (this.#wantPlay) e.target.playVideo()
+                        if (
+                            this.#wantPlay &&
+                            readyProjectedMs >= np.startedAtMs
+                        ) {
+                            this.#awaitingServerStart = false
+                            e.target.playVideo()
+                        }
                     },
                     onStateChange: (e: { data: number }): void => {
                         const ps = window.YT.PlayerState
@@ -337,6 +433,14 @@ export class AimogeJukeboxElement extends HTMLElement {
                                     type: "playing",
                                     id: this.#instanceId,
                                 })
+                            }
+                            // ネイティブ操作での一時停止もユーザーの停止意図として扱う
+                            // （アプリの一時停止ボタンと同様に #wantPlay を倒す）。これで未来
+                            // ウィンドウ中に native pause しても終端の自動再生で上書きしない。
+                            if (!playing) {
+                                this.#wantPlay = false
+                                this.#awaitingServerStart = false
+                                this.#clearStartTimer()
                             }
                             this.#isPlaying = playing
                             this.#renderUI()
@@ -357,6 +461,7 @@ export class AimogeJukeboxElement extends HTMLElement {
         const parsed = parseJukeboxUrl(url)
         if (!parsed) {
             this.#enqueueError = "YouTube の URL を入力してください"
+            this.#enqueueErrorAtMs = Date.now()
             this.#renderUI()
             return
         }
@@ -369,6 +474,7 @@ export class AimogeJukeboxElement extends HTMLElement {
             const err = e as { status?: number; code?: string | null }
             // enqueueErrorMessage: code(duration_too_long 等) 優先 → 403/409/415/429
             this.#enqueueError = enqueueErrorMessage(err.status ?? 0, err.code)
+            this.#enqueueErrorAtMs = Date.now()
             this.#renderUI()
         }
     }
@@ -382,9 +488,9 @@ export class AimogeJukeboxElement extends HTMLElement {
         }
     }
 
-    async #handleCancelMine(): Promise<void> {
+    async #handleCancelMine(trackId: number): Promise<void> {
         try {
-            await this.#client?.cancelMine()
+            await this.#client?.cancelMine(trackId)
             void this.#pollState()
         } catch {
             // サイレント無視
@@ -398,18 +504,33 @@ export class AimogeJukeboxElement extends HTMLElement {
         if (!this.#ytPlayer) return
         if (this.#isPlaying) {
             this.#wantPlay = false
+            this.#awaitingServerStart = false
+            this.#clearStartTimer()
             this.#ytPlayer.pauseVideo()
         } else {
             this.#wantPlay = true
-            // 再生開始時はライブ位置へ合わせてから再生（押した時点の現在地に追いつく）
             const st = this.#state
             const np = st?.nowPlaying
             if (st && np) {
-                const liveSec =
-                    playbackOffsetSec(np.startedAtMs, st.serverNowMs) +
-                    (Date.now() - this.#fetchedAtClientMs) / 1000
-                this.#ytPlayer.seekTo(liveSec, true)
+                const projectedNowMs =
+                    st.serverNowMs + (Date.now() - this.#fetchedAtClientMs)
+                if (projectedNowMs < np.startedAtMs) {
+                    // まだサーバー開始前: 即再生すると後でドリフト補正に巻き戻される。
+                    // 0 で待機し、started_at ちょうどにタイマーで自動再生する。
+                    this.#awaitingServerStart = true
+                    this.#ytPlayer.seekTo(0, true)
+                    this.#scheduleServerStart(np.startedAtMs - projectedNowMs)
+                    this.#renderUI()
+                    return
+                }
+                // サーバー開始済み: ライブ位置（クランプ済み）へ合わせてから再生。
+                this.#ytPlayer.seekTo(
+                    playbackOffsetSec(np.startedAtMs, projectedNowMs),
+                    true,
+                )
             }
+            this.#awaitingServerStart = false
+            this.#clearStartTimer()
             this.#ytPlayer.playVideo()
         }
     }
@@ -459,7 +580,8 @@ export class AimogeJukeboxElement extends HTMLElement {
                 state: this.#state,
                 onEnqueue: (url: string) => this.#handleEnqueue(url),
                 onVote: (trackId: number) => this.#handleVote(trackId),
-                onCancelMine: () => this.#handleCancelMine(),
+                onCancelMine: (trackId: number) =>
+                    this.#handleCancelMine(trackId),
                 onTogglePlay: () => this.#handleTogglePlay(),
                 // プレイヤー未生成/破棄後は再生中表示を残さない
                 isPlaying: this.#ytPlayer != null && this.#isPlaying,
