@@ -158,6 +158,19 @@ describe("cancelMine", () => {
         const client = createJukeboxClient({ baseUrl: BASE })
         await expect(client.cancelMine()).rejects.toMatchObject({ status: 404 })
     })
+
+    it("with a trackId, sends ?trackId= so the server deletes only that track", async () => {
+        mockFetch({ ok: true })
+        const client = createJukeboxClient({ baseUrl: BASE })
+        await expect(client.cancelMine(42)).resolves.toBeUndefined()
+        expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+            `${BASE}/api/queue/mine?trackId=42`,
+            {
+                method: "DELETE",
+                credentials: "omit",
+            },
+        )
+    })
 })
 
 describe("vote", () => {

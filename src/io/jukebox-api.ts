@@ -40,7 +40,12 @@ export interface JukeboxClient {
     getHistory(): Promise<JukeboxHistory>
     postPresence(): Promise<void>
     enqueue(url: string): Promise<void>
-    cancelMine(): Promise<void>
+    /**
+     * 予約キューから自分のトラックを削除する。
+     * trackId 指定でそのトラック1曲だけ削除（所有者一致が必要）。
+     * 省略時は自分の queued を全削除（後方互換）。
+     */
+    cancelMine(trackId?: number): Promise<void>
     /**
      * 指定トラックの除外投票をトグルする（再度押すと取消）。
      * trackId を省略すると再生中トラックを対象にする（後方互換）。
@@ -90,8 +95,12 @@ export function createJukeboxClient({
             await throwIfNotOk(res)
         },
 
-        async cancelMine(): Promise<void> {
-            const res = await fetch(`${base}/api/queue/mine`, {
+        async cancelMine(trackId?: number): Promise<void> {
+            const qs =
+                trackId !== undefined
+                    ? `?trackId=${encodeURIComponent(String(trackId))}`
+                    : ""
+            const res = await fetch(`${base}/api/queue/mine${qs}`, {
                 method: "DELETE",
                 credentials: "omit",
             })

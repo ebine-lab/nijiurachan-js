@@ -1,10 +1,12 @@
 /** @jsxImportSource preact */
 import type { VNode } from "preact"
 import { useState } from "preact/hooks"
-import type {
-    JukeboxHistoryItem,
-    JukeboxQueueItem,
-    JukeboxState,
+import {
+    computeQueueEtaMs,
+    formatClockTime,
+    type JukeboxHistoryItem,
+    type JukeboxQueueItem,
+    type JukeboxState,
 } from "../pure/jukebox"
 
 export interface JukeboxUIProps {
@@ -12,7 +14,8 @@ export interface JukeboxUIProps {
     onEnqueue: (url: string) => Promise<void>
     /** 指定トラックの除外投票をトグルする（再生中・キュー共通） */
     onVote: (trackId: number) => Promise<void>
-    onCancelMine: () => Promise<void>
+    /** 指定トラック(自分の曲)を予約キューから削除する */
+    onCancelMine: (trackId: number) => Promise<void>
     /** 再生/一時停止トグル（YT プレイヤーを直接操作） */
     onTogglePlay: () => void
     /** YT プレイヤーが再生中か（ボタン表示の切替に使う） */
@@ -68,6 +71,37 @@ function VoteButton(props: {
             onClick={() => void handleClick()}
         >
             {myVoted ? "投票済み(取消)" : "除外投票"}
+        </button>
+    )
+}
+
+/**
+ * 自分の曲のキャンセルボタン。リクエスト飛行中は無効化して連打による多重 DELETE を防ぐ
+ * （VoteButton と同じパターン）。
+ */
+function CancelButton(props: {
+    trackId: number
+    onCancelMine: (trackId: number) => Promise<void>
+}): VNode {
+    const { trackId, onCancelMine } = props
+    const [submitting, setSubmitting] = useState(false)
+    async function handleClick(): Promise<void> {
+        if (submitting) return
+        setSubmitting(true)
+        try {
+            await onCancelMine(trackId)
+        } finally {
+            setSubmitting(false)
+        }
+    }
+    return (
+        <button
+            type="button"
+            class="jukebox-cancel-btn"
+            disabled={submitting}
+            onClick={() => void handleClick()}
+        >
+            キャンセル
         </button>
     )
 }
@@ -150,6 +184,16 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
     const cooldownSec = state?.enqueueCooldownRemainingSec ?? 0
     const onCooldown = cooldownSec > 0
 
+    // 予約キュー各曲の再生開始の目安時刻(epoch ms)。曲尺の積み上げによる推定。
+    const queueEtas =
+        state != null
+            ? computeQueueEtaMs(
+                  state.nowPlaying,
+                  state.queue,
+                  state.serverNowMs,
+              )
+            : []
+
     async function handleEnqueue(e: Event): Promise<void> {
         e.preventDefault()
         if (!urlInput.trim() || submitting || onCooldown) return
@@ -221,35 +265,40 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
             )}
 
             <ul class="jukebox-queue">
-                {state?.queue.map((item: JukeboxQueueItem, index: number) => (
-                    <li key={`${index}-${item.source}:${item.mediaId}`}>
-                        {item.title ?? item.mediaId}
-                        {item.source === "youtube" && (
-                            <a
-                                class="jukebox-queue-url"
-                                href={youtubeWatchUrl(item.mediaId)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                            >
-                                {youtubeWatchUrl(item.mediaId)}
-                            </a>
-                        )}
-                        <VoteButton
-                            trackId={item.id}
-                            myVoted={item.myVoted}
-                            onVote={onVote}
-                        />
-                        {item.mine && (
-                            <button
-                                type="button"
-                                class="jukebox-cancel-btn"
-                                onClick={() => void onCancelMine()}
-                            >
-                                キャンセル
-                            </button>
-                        )}
-                    </li>
-                ))}
+                {state?.queue.map((item: JukeboxQueueItem, index: number) => {
+                    const etaMs = queueEtas[index]
+                    return (
+                        <li key={`${index}-${item.source}:${item.mediaId}`}>
+                            {item.title ?? item.mediaId}
+                            {etaMs != null && (
+                                <span class="jukebox-queue-eta">
+                                    {formatClockTime(etaMs)}頃
+                                </span>
+                            )}
+                            {item.source === "youtube" && (
+                                <a
+                                    class="jukebox-queue-url"
+                                    href={youtubeWatchUrl(item.mediaId)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    {youtubeWatchUrl(item.mediaId)}
+                                </a>
+                            )}
+                            <VoteButton
+                                trackId={item.id}
+                                myVoted={item.myVoted}
+                                onVote={onVote}
+                            />
+                            {item.mine && (
+                                <CancelButton
+                                    trackId={item.id}
+                                    onCancelMine={onCancelMine}
+                                />
+                            )}
+                        </li>
+                    )
+                })}
             </ul>
 
             <form
@@ -301,6 +350,9 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
                     ) : (
                         history.map((h: JukeboxHistoryItem, index: number) => (
                             <li key={`${index}-${h.id}`}>
+                                <span class="jukebox-history-time">
+                                    {formatClockTime(h.startedAtMs)} 開始
+                                </span>
                                 {h.title ?? h.mediaId}
                                 {h.source === "youtube" && (
                                     <a
