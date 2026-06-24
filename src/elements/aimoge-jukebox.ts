@@ -216,6 +216,9 @@ export class AimogeJukeboxElement extends HTMLElement {
         this.#ytPlayer?.destroy()
         this.#ytPlayer = null
         this.#currentTrackId = null
+        // 再生中に破棄しても #isPlaying が残ると、再生成後の PLAYING で
+        // playing && !#isPlaying が成立せず別タブ停止通知が飛ばない。合わせてリセットする。
+        this.#isPlaying = false
         render(null, this)
     }
 
@@ -277,6 +280,8 @@ export class AimogeJukeboxElement extends HTMLElement {
                 this.#ytPlayer.destroy()
                 this.#ytPlayer = null
                 this.#currentTrackId = null
+                // 破棄時は #isPlaying も倒す（再生成後の PLAYING 通知が飛ぶように）。
+                this.#isPlaying = false
             }
             return
         }
