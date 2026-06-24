@@ -465,9 +465,10 @@ describe("AimogeJukeboxElement", () => {
         expect(seekSec).toBeGreaterThan(2) // expected ≈ 10s
     })
 
-    it("started_at が未来（ロードラグ吸収中）は再生位置が進んでいてもドリフトで巻き戻さない", async () => {
-        // 曲送り直後を模す: started_at_ms = serverNow + 4s（NEW_TRACK_START_LAG_MS 相当・未来）。
-        // 暖機済みプレイヤーが先頭から先に再生してしまっても、サーバー開始前は seekTo で巻き戻さない。
+    it("曲送り直後の僅か未来 started_at は onReady で 0 にクランプしてシークする（負値で先送りしない）", async () => {
+        // 曲送り直後を模す: started_at_ms = serverNow + 1.5s（NEW_TRACK_START_LAG_MS 相当・僅か未来）。
+        // onReady は未来ぶんを 0 にクランプしてシークする（負のオフセットにしない）。
+        // 前倒しはドリフト閾値(2s)未満なので、即再生してもリードが閾値を超えず巻き戻らない。
         const stateFuture = {
             ...IDLE_STATE,
             nowPlaying: {
@@ -478,7 +479,7 @@ describe("AimogeJukeboxElement", () => {
                 durationSec: 300,
                 mine: false,
                 myVoted: false,
-                startedAtMs: 1_000_000 + 4_000, // 4s 未来
+                startedAtMs: 1_000_000 + 1_500, // 1.5s 未来（前倒しぶん）
                 isReplay: false,
             },
             serverNowMs: 1_000_000,
@@ -494,14 +495,6 @@ describe("AimogeJukeboxElement", () => {
         // onReady は未来開始ぶんを 0 にクランプしてシーク（前進・負値ではない）
         const [readySec] = playerInstance.seekTo.mock.calls[0] as [number]
         expect(readySec).toBe(0)
-        const seeksAfterReady = playerInstance.seekTo.mock.calls.length
-
-        // 暖機済みで先頭から数秒進んだ状態（旧コードなら drift=3s>2s で 0 へ巻き戻していた）
-        playerInstance.getCurrentTime.mockReturnValue(3)
-        await vi.advanceTimersByTimeAsync(3000) // 2回目ポーリング（state据え置き＝依然 未来）
-
-        // 未来開始ウィンドウ中はドリフト補正の seekTo を追加で呼ばない（巻き戻しスタッター防止）
-        expect(playerInstance.seekTo.mock.calls.length).toBe(seeksAfterReady)
     })
 
     // #wantPlay=true にするため再生ボタンを押すヘルパー（過去開始の通常曲で player を用意してから）
@@ -540,97 +533,155 @@ describe("AimogeJukeboxElement", () => {
         return { el, player }
     }
 
-    it("未来開始の新曲は started_at ちょうどにタイマーで一度だけ自動再生する", async () => {
+    it("再生中(wantPlay)に新曲が届いたら cue で待たず loadVideoById で即再生する", async () => {
         const { player } = await mountPlayingThenPressPlay()
         expect(player.playVideo).toHaveBeenCalled() // #wantPlay=true になった
-
-        // 次の曲が started_at 未来(+4s)で届く（同 player 使い回し）
-        const t1 = 1_000_000 + 3_000
-        const future = {
-            ...IDLE_STATE,
-            serverNowMs: t1,
-            nowPlaying: {
-                id: 2,
-                source: "youtube" as const,
-                mediaId: "futuresong00",
-                title: "Future",
-                durationSec: 300,
-                mine: false,
-                myVoted: false,
-                startedAtMs: t1 + 4_000,
-                isReplay: false,
-            },
-        }
-        vi.stubGlobal("fetch", makeStateFetch(future))
-        player.playVideo.mockClear()
+        player.loadVideoById.mockClear()
         player.cueVideoById.mockClear()
 
-        await vi.advanceTimersByTimeAsync(3000) // 次ポーリング → 新曲 cue + 開始タイマー予約
-        expect(player.cueVideoById).toHaveBeenCalled() // 未来中は cue
-        expect(player.playVideo).not.toHaveBeenCalled() // まだ鳴らさない
-
-        await vi.advanceTimersByTimeAsync(4000) // started_at 到達 → タイマー発火
-        expect(player.playVideo).toHaveBeenCalledTimes(1) // ちょうど一度だけ自動再生
-    })
-
-    it("未来ウィンドウ中のネイティブ一時停止は終端の自動再生で上書きされない", async () => {
-        const { player } = await mountPlayingThenPressPlay()
-
+        // 次の曲（別 mediaId）が届く。started_at が僅か未来(+1.5s)でも即ロード再生する。
         const t1 = 1_000_000 + 3_000
-        const future = {
+        const next = {
             ...IDLE_STATE,
             serverNowMs: t1,
             nowPlaying: {
                 id: 2,
                 source: "youtube" as const,
-                mediaId: "futuresong00",
-                title: "Future",
+                mediaId: "nextsong0000",
+                title: "Next",
                 durationSec: 300,
                 mine: false,
                 myVoted: false,
-                startedAtMs: t1 + 4_000,
+                startedAtMs: t1 + 1_500, // 前倒しぶん（僅か未来）
                 isReplay: false,
             },
         }
-        vi.stubGlobal("fetch", makeStateFetch(future))
-        await vi.advanceTimersByTimeAsync(3000) // 新曲 cue + タイマー予約（awaiting=true）
-        player.playVideo.mockClear()
+        vi.stubGlobal("fetch", makeStateFetch(next))
 
-        // ユーザーがネイティブ操作で一時停止 → onStateChange(PAUSED)
-        player._stateChangeCallback?.({ data: YT_STATE.PAUSED })
-
-        // started_at 到達してもタイマー/ポーリングは自動再生しない（停止意図を尊重）
-        await vi.advanceTimersByTimeAsync(5000)
-        expect(player.playVideo).not.toHaveBeenCalled()
+        await vi.advanceTimersByTimeAsync(3000) // 次ポーリング → 新曲
+        // wantPlay 中なので cue ではなく load（＝ロード完了次第すぐ再生）。
+        expect(player.loadVideoById).toHaveBeenCalledWith(
+            "nextsong0000",
+            expect.any(Number),
+        )
+        expect(player.cueVideoById).not.toHaveBeenCalled()
+        // クランプ済みオフセット（僅か未来ぶんは 0 付近）から開始＝先頭スキップしない
+        const [, loadSec] = player.loadVideoById.mock.calls[0] as [
+            string,
+            number,
+        ]
+        // 僅か未来ぶんは 0 にクランプされる＝厳密に先頭から（head-skip なし）
+        expect(loadSec).toBe(0)
     })
 
-    it("同一 mediaId の次トラックが未来開始でも開始待ちを張り直して自動再生する (P1)", async () => {
-        const { player } = await mountPlayingThenPressPlay() // mediaId "pastsong0000" 再生中
-        player.playVideo.mockClear()
+    it("同一 mediaId でも別トラック(id 変化)なら loadVideoById で再ロード再生する（連続予約）", async () => {
+        // 同じ曲を連続予約等で、mediaId が同一のまま id だけ変わる次トラックが届くケース。
+        // mediaId 一致だけで判定するとドリフト分岐に落ちて再生が始まらない（無音）ため、
+        // 行 id で別トラックと判定して loadVideoById で再生し直す。
+        const { player } = await mountPlayingThenPressPlay() // mediaId "pastsong0000" (id 1) 再生中
+        player.loadVideoById.mockClear()
+        player.cueVideoById.mockClear()
 
-        // 別 id だが「同じ mediaId」の次トラックが started_at 未来(+4s)で届く（同じ曲を連続予約等）
         const t1 = 1_000_000 + 3_000
-        const sameMediaFuture = {
+        const sameMediaNewId = {
             ...IDLE_STATE,
             serverNowMs: t1,
             nowPlaying: {
-                id: 2,
+                id: 2, // ★ id が変わる
                 source: "youtube" as const,
-                mediaId: "pastsong0000", // ★ 現在と同一 mediaId
+                mediaId: "pastsong0000", // ★ mediaId は同一
                 title: "Same Song (replay)",
                 durationSec: 300,
                 mine: false,
                 myVoted: false,
-                startedAtMs: t1 + 4_000,
+                startedAtMs: t1 + 1_500,
                 isReplay: false,
             },
         }
-        vi.stubGlobal("fetch", makeStateFetch(sameMediaFuture))
-        await vi.advanceTimersByTimeAsync(3000) // 同曲分岐で再 arm（早期 return せずタイマー予約）
-        expect(player.playVideo).not.toHaveBeenCalled() // 未来中はまだ鳴らさない
+        vi.stubGlobal("fetch", makeStateFetch(sameMediaNewId))
+        await vi.advanceTimersByTimeAsync(3000)
 
-        await vi.advanceTimersByTimeAsync(4000) // started_at 到達 → 張り直したタイマーで自動再生
-        expect(player.playVideo).toHaveBeenCalledTimes(1)
+        // 別トラック扱いで再ロード（ドリフト分岐に落ちて無音、にならない）
+        expect(player.loadVideoById).toHaveBeenCalledWith(
+            "pastsong0000",
+            expect.any(Number),
+        )
+    })
+
+    it("プレイヤー再生成時、再生意図(wantPlay)が立っていれば onReady で即再生する", async () => {
+        // 再生中(wantPlay=true)に nowPlaying が一旦 null になり player が破棄され、
+        // 再び youtube 曲が来て player が作り直される経路。onReady は wantPlay を尊重して再生する
+        // （旧コードの「サーバー開始前は鳴らさない」ガードが復活していないことを固定する）。
+        const { el } = await mountPlayingThenPressPlay() // wantPlay=true
+
+        // nowPlaying=null → player 破棄
+        vi.stubGlobal("fetch", makeStateFetch(IDLE_STATE))
+        await vi.advanceTimersByTimeAsync(3000)
+
+        // 再び youtube 曲 → player 作り直し（onReady 発火）
+        const t1 = 1_000_000 + 6_000
+        const back = {
+            ...IDLE_STATE,
+            serverNowMs: t1,
+            nowPlaying: {
+                id: 3,
+                source: "youtube" as const,
+                mediaId: "rebornsong00",
+                title: "Reborn",
+                durationSec: 300,
+                mine: false,
+                myVoted: false,
+                startedAtMs: t1 + 1_500, // 僅か未来でも待たず鳴らす
+                isReplay: false,
+            },
+        }
+        vi.stubGlobal("fetch", makeStateFetch(back))
+        await vi.advanceTimersByTimeAsync(3000)
+
+        const reborn = getMockYT().Player._lastInstance
+        if (!reborn) throw new Error("player not reconstructed")
+        reborn.playVideo.mockClear()
+        reborn._readyCallback?.({ target: reborn })
+        // wantPlay が立っているので onReady で再生する
+        expect(reborn.playVideo).toHaveBeenCalledTimes(1)
+        void el
+    })
+
+    it("ネイティブ一時停止は wantPlay を倒し、以降の新曲は cue のみで自動再生しない", async () => {
+        const { player } = await mountPlayingThenPressPlay()
+
+        // ユーザーがネイティブ操作で一時停止 → onStateChange(PAUSED) で wantPlay=false
+        player._stateChangeCallback?.({ data: YT_STATE.PAUSED })
+        player.loadVideoById.mockClear()
+        player.cueVideoById.mockClear()
+        player.playVideo.mockClear()
+
+        const t1 = 1_000_000 + 3_000
+        const next = {
+            ...IDLE_STATE,
+            serverNowMs: t1,
+            nowPlaying: {
+                id: 2,
+                source: "youtube" as const,
+                mediaId: "nextsong0000",
+                title: "Next",
+                durationSec: 300,
+                mine: false,
+                myVoted: false,
+                startedAtMs: t1 - 5_000, // 過去開始（停止していなければ即再生する位置）
+                isReplay: false,
+            },
+        }
+        vi.stubGlobal("fetch", makeStateFetch(next))
+        await vi.advanceTimersByTimeAsync(3000)
+
+        // 停止意図を尊重: cue のみ（音を出さない）。load/play は呼ばない。
+        expect(player.cueVideoById).toHaveBeenCalledWith(
+            "nextsong0000",
+            expect.any(Number),
+        )
+        expect(player.loadVideoById).not.toHaveBeenCalled()
+        expect(player.playVideo).not.toHaveBeenCalled()
     })
 
     it("enqueue エラーは即座には消えず ~12秒で自動クリアされる", async () => {
