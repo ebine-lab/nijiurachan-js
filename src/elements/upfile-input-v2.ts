@@ -61,8 +61,8 @@ export const makeUpfileInputV2Element = (
                 h(UpfileInputV2, {
                     form: form,
                     allowImageReplies: allowImageReplies,
-                    canvasWidth: 400,
-                    canvasHeight: 266,
+                    canvasWidth: 600,
+                    canvasHeight: 424,
                     bindCommands: (cmds: UpfileV2Commands) => {
                         this.#commands = cmds
                     },

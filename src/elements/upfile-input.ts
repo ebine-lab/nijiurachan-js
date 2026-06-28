@@ -38,8 +38,8 @@ export const makeUpfileInputElement = (
                 h(UpfileInput, {
                     form: form,
                     allowImageReplies: allowImageReplies,
-                    canvasWidth: 400,
-                    canvasHeight: 266,
+                    canvasWidth: 600,
+                    canvasHeight: 424,
                     onStateChange: (flags: UpfileStateFlags) => {
                         this.dispatchEvent(
                             new CustomEvent("aimg:upfile-state", {

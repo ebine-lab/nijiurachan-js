@@ -93,8 +93,8 @@ export class AxnosPaintHostElement extends HTMLElement {
             "#fd2d9b",
         ]
 
-        const width = Number.parseInt(this.dataset.width ?? "", 10) || 400
-        const height = Number.parseInt(this.dataset.height ?? "", 10) || 266
+        const width = Number.parseInt(this.dataset.width ?? "", 10) || 600
+        const height = Number.parseInt(this.dataset.height ?? "", 10) || 424
 
         return new Promise((resolve) => {
             new AXNOSPaint({
