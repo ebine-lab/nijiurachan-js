@@ -382,6 +382,7 @@ export function enqueueErrorMessage(
     if (status === 403) return "追加は書き込んだユーザーのみ可能です"
     if (status === 409) return "既に1曲追加済みです（再生後にまた追加できます）"
     if (status === 415) return "対応していない URL です"
-    if (status === 429) return "30分に1曲までです。時間をおいて試してください"
+    if (status === 429)
+        return "続けて追加できません。時間をおいて試してください（キューが混むほど追加間隔が長くなります）"
     return `エラーが発生しました（HTTP ${status}）`
 }
