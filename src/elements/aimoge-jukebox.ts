@@ -76,7 +76,7 @@ const STATE_INTERVAL_MS = 3_000
 const PRESENCE_INTERVAL_MS = 10_000
 const DRIFT_THRESHOLD_SEC = 2
 // enqueue エラー文の自動消滅までの時間。読み切れる長さは残しつつ、
-// クールダウン(30分)明けまで残って「追加可能なのにエラー表示」になる矛盾を防ぐ。
+// クールダウン(可変・最短5分)明けまで残って「追加可能なのにエラー表示」になる矛盾を防ぐ。
 const ENQUEUE_ERROR_TTL_MS = 12_000
 const DEFAULT_BASE_URL = "https://music.nijiurachan.net"
 
