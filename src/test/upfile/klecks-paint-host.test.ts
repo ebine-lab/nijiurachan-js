@@ -50,6 +50,12 @@ describe(KlecksPaintHostElement, () => {
     let errorSpy: Mock<typeof console.error> | undefined
     let fetchSpy: Mock<typeof fetch> | undefined
     let closeSpy: Mock<typeof window.close> | undefined
+    let canvasContextSpy:
+        | Mock<typeof HTMLCanvasElement.prototype.getContext>
+        | undefined
+    let canvasToBlobSpy:
+        | Mock<typeof HTMLCanvasElement.prototype.toBlob>
+        | undefined
 
     beforeEach(() => {
         const values = new Map<string, string>()
@@ -77,11 +83,16 @@ describe(KlecksPaintHostElement, () => {
         errorSpy?.mockRestore()
         fetchSpy?.mockRestore()
         closeSpy?.mockRestore()
+        canvasContextSpy?.mockRestore()
+        canvasToBlobSpy?.mockRestore()
         appendSpy = undefined
         alertSpy = undefined
         errorSpy = undefined
         fetchSpy = undefined
         closeSpy = undefined
+        canvasContextSpy = undefined
+        canvasToBlobSpy = undefined
+        vi.unstubAllGlobals()
         window.Klecks = undefined
         window.onbeforeunload = null
         localStorage.clear()
@@ -220,6 +231,7 @@ describe(KlecksPaintHostElement, () => {
                 }),
         } as Response)
         closeSpy = vi.spyOn(window, "close").mockReturnValue(undefined)
+        mockPreviewWebpEncoding("webp-preview")
         mockScriptLoad()
         window.Klecks = class FakeKlecks {
             readonly #options: FakeKlecksOptions
@@ -278,7 +290,10 @@ describe(KlecksPaintHostElement, () => {
         expect(body.width).toBe(123)
         expect(body.height).toBe(456)
         expect(body.source.layers[0].blob.data).toBe(btoa("layer"))
-        expect(body.preview_base64).toBe(btoa("image"))
+        expect(body.preview_base64).toBeUndefined()
+        expect(body.preview_data_url).toBe(
+            `data:image/webp;base64,${btoa("webp-preview")}`,
+        )
         expect(localStorage.getItem("aimg-klecks-cloud-drafts")).toContain(
             "aaaaaaaa",
         )
@@ -314,6 +329,7 @@ describe(KlecksPaintHostElement, () => {
                 }),
         } as Response)
         let bottomBar: HTMLElement | undefined
+        mockPreviewWebpEncoding("button-webp-preview")
         mockScriptLoad()
         window.Klecks = class FakeKlecks {
             constructor(options: FakeKlecksOptions) {
@@ -361,6 +377,12 @@ describe(KlecksPaintHostElement, () => {
         await waitUntil(() => fetchSpy?.mock.calls.length === 1)
 
         expect(fetchSpy).toHaveBeenCalledOnce()
+        const [, init] = fetchSpy.mock.calls[0] ?? []
+        const body = JSON.parse(String(init?.body))
+        expect(body.preview_base64).toBeUndefined()
+        expect(body.preview_data_url).toBe(
+            `data:image/webp;base64,${btoa("button-webp-preview")}`,
+        )
         expect(opener.dispatchEvent).not.toHaveBeenCalled()
         expect(localStorage.getItem(KLECKS_CLOUD_DRAFTS_STORAGE_KEY)).toContain(
             "cccccccc",
@@ -597,6 +619,29 @@ describe(KlecksPaintHostElement, () => {
                     }, 0)
                 }
                 return result
+            })
+    }
+
+    function mockPreviewWebpEncoding(data: string): void {
+        vi.stubGlobal(
+            "createImageBitmap",
+            vi.fn(() =>
+                Promise.resolve({
+                    width: 1,
+                    height: 1,
+                    close: vi.fn(),
+                }),
+            ),
+        )
+        canvasContextSpy = vi
+            .spyOn(HTMLCanvasElement.prototype, "getContext")
+            .mockReturnValue({
+                drawImage: vi.fn(),
+            } as unknown as CanvasRenderingContext2D)
+        canvasToBlobSpy = vi
+            .spyOn(HTMLCanvasElement.prototype, "toBlob")
+            .mockImplementation((callback, type) => {
+                callback(new Blob([data], { type: type ?? "image/webp" }))
             })
     }
 })

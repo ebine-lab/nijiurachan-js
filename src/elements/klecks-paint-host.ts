@@ -340,7 +340,7 @@ export class KlecksPaintHostElement extends HTMLElement {
             width: project.width,
             height: project.height,
             source,
-            preview_base64: await blobToBase64(image),
+            preview_data_url: await blobToWebpDataUrl(image),
         }
         const headers: Record<string, string> = {
             "Content-Type": "application/json",
@@ -514,6 +514,42 @@ async function blobToBase64(blob: Blob): Promise<string> {
     }
 
     return btoa(binary)
+}
+
+async function blobToWebpDataUrl(blob: Blob): Promise<string> {
+    if (blob.type === "image/webp") {
+        return `data:image/webp;base64,${await blobToBase64(blob)}`
+    }
+
+    const bitmap = await createImageBitmap(blob)
+    try {
+        const canvas = document.createElement("canvas")
+        canvas.width = bitmap.width
+        canvas.height = bitmap.height
+        const context = canvas.getContext("2d")
+        if (!context) {
+            throw new Error("Failed to create preview canvas context")
+        }
+        context.drawImage(bitmap, 0, 0)
+
+        const webp = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob(
+                (converted) => {
+                    if (converted) {
+                        resolve(converted)
+                    } else {
+                        reject(new Error("Failed to encode preview as WebP"))
+                    }
+                },
+                "image/webp",
+                0.9,
+            )
+        })
+
+        return `data:image/webp;base64,${await blobToBase64(webp)}`
+    } finally {
+        bitmap.close()
+    }
 }
 
 function readCloudDraftState(): CloudDraftState {
