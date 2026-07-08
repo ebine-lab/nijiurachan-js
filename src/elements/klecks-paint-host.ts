@@ -23,6 +23,7 @@ type KlecksEmbed = {
 
 type KlecksConstructor = new (options: {
     onSubmit: KlecksSubmitCallback
+    bottomBar?: HTMLElement
 }) => KlecksEmbed
 
 declare global {
@@ -132,7 +133,10 @@ export class KlecksPaintHostElement extends HTMLElement {
             throw new Error("Klecks is not available")
         }
 
-        const klecks = new Klecks({
+        let klecks: KlecksEmbed
+        const bottomBar = this.#createBottomBar(() => klecks)
+        klecks = new Klecks({
+            bottomBar,
             onSubmit: async (
                 onSuccess: () => void,
                 onError: () => void,
@@ -161,6 +165,45 @@ export class KlecksPaintHostElement extends HTMLElement {
         })
 
         await this.#openInitialProject(klecks)
+    }
+
+    #createBottomBar(getKlecks: () => KlecksEmbed): HTMLElement {
+        const wrapper = document.createElement("div")
+        wrapper.style.display = "flex"
+        wrapper.style.alignItems = "center"
+        wrapper.style.gap = "8px"
+
+        const saveButton = document.createElement("button")
+        saveButton.type = "button"
+        saveButton.textContent = "クラウド保存"
+        saveButton.addEventListener("click", () => {
+            void this.#saveFromButton(getKlecks(), saveButton)
+        })
+        wrapper.append(saveButton)
+
+        return wrapper
+    }
+
+    async #saveFromButton(
+        klecks: KlecksEmbed,
+        saveButton: HTMLButtonElement,
+    ): Promise<void> {
+        const previousText = saveButton.textContent ?? "クラウド保存"
+        saveButton.disabled = true
+        saveButton.textContent = "保存中"
+        try {
+            const image = await klecks.getPNG()
+            await this.#saveCloudDraft(klecks, image)
+            saveButton.textContent = "保存済み"
+        } catch (error) {
+            console.warn("Failed to save Klecks cloud draft:", error)
+            saveButton.textContent = "保存失敗"
+        } finally {
+            window.setTimeout(() => {
+                saveButton.disabled = false
+                saveButton.textContent = previousText
+            }, 1200)
+        }
     }
 
     #makeInitialProject(): KlecksProject {

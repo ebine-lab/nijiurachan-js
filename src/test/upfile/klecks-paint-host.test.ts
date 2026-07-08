@@ -285,6 +285,88 @@ describe(KlecksPaintHostElement, () => {
         expect(opener.dispatchEvent).toHaveBeenCalled()
     })
 
+    test("下部バーのクラウド保存ボタンで投稿せずに保存する", async () => {
+        const image = new Blob(["image"], { type: "image/png" })
+        const opener = {
+            closed: false,
+            dispatchEvent: vi.fn(),
+        }
+        Object.defineProperty(window, "opener", {
+            configurable: true,
+            value: opener,
+        })
+        fetchSpy = vi.spyOn(window, "fetch").mockResolvedValue({
+            ok: true,
+            json: () =>
+                Promise.resolve({
+                    ok: true,
+                    data: {
+                        save_key: "c".repeat(64),
+                        draft: {
+                            id: "project-button",
+                            title: "Klecks draft",
+                            updated_at: "2026-07-08T00:00:00+00:00",
+                            width: 200,
+                            height: 100,
+                            total_bytes: 10,
+                        },
+                    },
+                }),
+        } as Response)
+        let bottomBar: HTMLElement | undefined
+        mockScriptLoad()
+        window.Klecks = class FakeKlecks {
+            constructor(options: FakeKlecksOptions) {
+                bottomBar = options.bottomBar
+            }
+
+            openProject(): void {
+                return
+            }
+
+            getPNG(): Promise<Blob> {
+                return Promise.resolve(image)
+            }
+
+            getStorageProject(): Promise<FakeKlecksStorageProject> {
+                return Promise.resolve({
+                    id: 1 as const,
+                    projectId: "project-button",
+                    timestamp: 1,
+                    thumbnail: new Blob(["thumbnail"], { type: "image/png" }),
+                    width: 200,
+                    height: 100,
+                    layers: [
+                        {
+                            name: "Background",
+                            isVisible: true,
+                            opacity: 1,
+                            mixModeStr: "source-over",
+                            blob: new Blob(["layer"], { type: "image/png" }),
+                        },
+                    ],
+                })
+            }
+        }
+
+        const host = document.createElement(TAG)
+        host.dataset.embedSrc = "embed.js"
+        host.dataset.draftApi = "/api/oekaki-drafts"
+        document.body.appendChild(host)
+        await waitUntil(() => bottomBar !== undefined)
+
+        const saveButton = bottomBar?.querySelector("button")
+        expect(saveButton?.textContent).toBe("クラウド保存")
+        saveButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+        await waitUntil(() => fetchSpy?.mock.calls.length === 1)
+
+        expect(fetchSpy).toHaveBeenCalledOnce()
+        expect(opener.dispatchEvent).not.toHaveBeenCalled()
+        expect(localStorage.getItem(KLECKS_CLOUD_DRAFTS_STORAGE_KEY)).toContain(
+            "cccccccc",
+        )
+    })
+
     test("保存済みクラウド下書きがあれば起動時に復元する", async () => {
         const saveKey = "b".repeat(64)
         localStorage.setItem(
