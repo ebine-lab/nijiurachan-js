@@ -40,6 +40,18 @@ declare global {
             popupId: string
             /** 描き終えた画像。失敗した場合null */
             image: Blob | null
+            /** Klecksクラウド下書き保存に成功した場合の軽量メタデータ */
+            cloudDraft?: {
+                saveKey: string
+                draft: {
+                    id: string
+                    title?: string
+                    width?: number
+                    height?: number
+                    total_bytes?: number
+                    updated_at?: string
+                }
+            } | null
             /** 親画面でイベントが受け取られたらtrueに設定される */
             isAccepted: boolean
         }>

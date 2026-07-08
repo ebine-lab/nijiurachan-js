@@ -1,5 +1,16 @@
-import { afterEach, describe, expect, type Mock, test, vi } from "vitest"
-import { KlecksPaintHostElement } from "#js/elements/klecks-paint-host"
+import {
+    afterEach,
+    beforeEach,
+    describe,
+    expect,
+    type Mock,
+    test,
+    vi,
+} from "vitest"
+import {
+    KLECKS_CLOUD_DRAFTS_STORAGE_KEY,
+    KlecksPaintHostElement,
+} from "#js/elements/klecks-paint-host"
 
 type FakeKlecksOptions = ConstructorParameters<
     NonNullable<typeof window.Klecks>
@@ -7,6 +18,13 @@ type FakeKlecksOptions = ConstructorParameters<
 type FakeKlecksProject = Parameters<
     InstanceType<NonNullable<typeof window.Klecks>>["openProject"]
 >[0]
+type FakeKlecksStorageProject = Awaited<
+    ReturnType<
+        NonNullable<
+            InstanceType<NonNullable<typeof window.Klecks>>["getStorageProject"]
+        >
+    >
+>
 
 const TAG = "klecks-paint-host-test"
 if (!customElements.get(TAG)) {
@@ -16,20 +34,57 @@ if (!customElements.get(TAG)) {
 const nextTask = (): Promise<void> =>
     new Promise((resolve) => setTimeout(resolve, 0))
 
+async function waitUntil(predicate: () => boolean): Promise<void> {
+    for (let i = 0; i < 20; i++) {
+        if (predicate()) {
+            return
+        }
+        await nextTask()
+    }
+    throw new Error("condition was not reached")
+}
+
 describe(KlecksPaintHostElement, () => {
     let appendSpy: Mock<typeof document.head.appendChild> | undefined
     let alertSpy: Mock<typeof window.alert> | undefined
     let errorSpy: Mock<typeof console.error> | undefined
+    let fetchSpy: Mock<typeof fetch> | undefined
+    let closeSpy: Mock<typeof window.close> | undefined
+
+    beforeEach(() => {
+        const values = new Map<string, string>()
+        const storage = {
+            clear: vi.fn(() => values.clear()),
+            getItem: vi.fn((key: string) => values.get(key) ?? null),
+            removeItem: vi.fn((key: string) => values.delete(key)),
+            setItem: vi.fn((key: string, value: string) => {
+                values.set(key, value)
+            }),
+        }
+        Object.defineProperty(globalThis, "localStorage", {
+            configurable: true,
+            value: storage,
+        })
+        Object.defineProperty(window, "localStorage", {
+            configurable: true,
+            value: storage,
+        })
+    })
 
     afterEach(() => {
         appendSpy?.mockRestore()
         alertSpy?.mockRestore()
         errorSpy?.mockRestore()
+        fetchSpy?.mockRestore()
+        closeSpy?.mockRestore()
         appendSpy = undefined
         alertSpy = undefined
         errorSpy = undefined
+        fetchSpy = undefined
+        closeSpy = undefined
         window.Klecks = undefined
         window.onbeforeunload = null
+        localStorage.clear()
         Object.defineProperty(window, "opener", {
             configurable: true,
             value: null,
@@ -129,6 +184,201 @@ describe(KlecksPaintHostElement, () => {
 
         expect(project?.width).toBe(600)
         expect(project?.height).toBe(424)
+    })
+
+    test("送信時に保存用プロジェクトをクラウド下書きAPIへ送る", async () => {
+        const image = new Blob(["image"], { type: "image/png" })
+        const opener = {
+            closed: false,
+            dispatchEvent: vi.fn((event: Event) => {
+                if (event instanceof CustomEvent) {
+                    event.detail.isAccepted = true
+                }
+                return true
+            }),
+        }
+        Object.defineProperty(window, "opener", {
+            configurable: true,
+            value: opener,
+        })
+        fetchSpy = vi.spyOn(window, "fetch").mockResolvedValue({
+            ok: true,
+            json: () =>
+                Promise.resolve({
+                    ok: true,
+                    data: {
+                        save_key: "a".repeat(64),
+                        draft: {
+                            id: "project-1",
+                            title: "Klecks draft",
+                            updated_at: "2026-07-08T00:00:00+00:00",
+                            width: 123,
+                            height: 456,
+                            total_bytes: 10,
+                        },
+                    },
+                }),
+        } as Response)
+        closeSpy = vi.spyOn(window, "close").mockReturnValue(undefined)
+        mockScriptLoad()
+        window.Klecks = class FakeKlecks {
+            readonly #options: FakeKlecksOptions
+
+            constructor(options: FakeKlecksOptions) {
+                this.#options = options
+            }
+
+            openProject(): void {
+                void this.#options.onSubmit(
+                    () => undefined,
+                    () => undefined,
+                )
+            }
+
+            getPNG(): Promise<Blob> {
+                return Promise.resolve(image)
+            }
+
+            getStorageProject(): Promise<FakeKlecksStorageProject> {
+                return Promise.resolve({
+                    id: 1 as const,
+                    projectId: "project-1",
+                    timestamp: 1,
+                    thumbnail: new Blob(["thumbnail"], { type: "image/png" }),
+                    width: 123,
+                    height: 456,
+                    layers: [
+                        {
+                            name: "Background",
+                            isVisible: true,
+                            opacity: 1,
+                            mixModeStr: "source-over",
+                            blob: new Blob(["layer"], { type: "image/png" }),
+                        },
+                    ],
+                })
+            }
+        }
+
+        const host = document.createElement(TAG)
+        host.dataset.embedSrc = "embed.js"
+        host.dataset.draftApi = "/api/oekaki-drafts"
+        document.body.appendChild(host)
+        await waitUntil(() => fetchSpy?.mock.calls.length === 1)
+        await waitUntil(() => opener.dispatchEvent.mock.calls.length === 1)
+
+        expect(fetchSpy).toHaveBeenCalledOnce()
+        const fetchCall = fetchSpy.mock.calls[0]
+        expect(fetchCall).toBeDefined()
+        const [url, init] = fetchCall ?? []
+        expect(url).toBe("/api/oekaki-drafts")
+        expect(init?.method).toBe("POST")
+        const body = JSON.parse(String(init?.body))
+        expect(body.draft_id).toBe("project-1")
+        expect(body.width).toBe(123)
+        expect(body.height).toBe(456)
+        expect(body.source.layers[0].blob.data).toBe(btoa("layer"))
+        expect(body.preview_base64).toBe(btoa("image"))
+        expect(localStorage.getItem("aimg-klecks-cloud-drafts")).toContain(
+            "aaaaaaaa",
+        )
+        expect(opener.dispatchEvent).toHaveBeenCalled()
+    })
+
+    test("保存済みクラウド下書きがあれば起動時に復元する", async () => {
+        const saveKey = "b".repeat(64)
+        localStorage.setItem(
+            KLECKS_CLOUD_DRAFTS_STORAGE_KEY,
+            JSON.stringify({
+                saveKey,
+                drafts: {
+                    draft_api: {
+                        id: "draft_api",
+                        updated_at: "2026-07-08T00:00:00+00:00",
+                    },
+                },
+            }),
+        )
+        Object.defineProperty(window, "opener", {
+            configurable: true,
+            value: {
+                closed: false,
+                dispatchEvent: vi.fn(),
+            },
+        })
+        fetchSpy = vi.spyOn(window, "fetch").mockResolvedValue({
+            ok: true,
+            json: () =>
+                Promise.resolve({
+                    ok: true,
+                    data: {
+                        draft: {
+                            source: {
+                                id: 1,
+                                projectId: "project-restored",
+                                timestamp: 1,
+                                thumbnail: {
+                                    contentType: "image/png",
+                                    size: 9,
+                                    data: btoa("thumbnail"),
+                                },
+                                width: 321,
+                                height: 654,
+                                layers: [
+                                    {
+                                        name: "Restored",
+                                        isVisible: true,
+                                        opacity: 1,
+                                        mixModeStr: "source-over",
+                                        blob: {
+                                            contentType: "image/png",
+                                            size: 5,
+                                            data: btoa("layer"),
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                }),
+        } as Response)
+        let blankProject: FakeKlecksProject | undefined
+        let restoredProject: unknown
+        mockScriptLoad()
+        window.Klecks = class FakeKlecks {
+            openProject(nextProject: FakeKlecksProject): void {
+                blankProject = nextProject
+            }
+
+            getPNG(): Promise<Blob> {
+                return Promise.resolve(new Blob())
+            }
+
+            openStorageProject(project: unknown): Promise<void> {
+                restoredProject = project
+                return Promise.resolve()
+            }
+        }
+
+        const host = document.createElement(TAG)
+        host.dataset.embedSrc = "embed.js"
+        host.dataset.draftApi = "/api/oekaki-drafts"
+        document.body.appendChild(host)
+        await waitUntil(() => restoredProject !== undefined)
+
+        expect(fetchSpy).toHaveBeenCalledOnce()
+        const [url, init] = fetchSpy.mock.calls[0] ?? []
+        expect(url).toBe("/api/oekaki-drafts/draft_api")
+        expect(
+            (init?.headers as Record<string, string>)["X-Oekaki-Save-Key"],
+        ).toBe(saveKey)
+        expect(restoredProject).toMatchObject({
+            projectId: "project-restored",
+            width: 321,
+            height: 654,
+            layers: [{ name: "Restored" }],
+        })
+        expect(blankProject).toBeUndefined()
     })
 
     function mockScriptLoad(): void {
