@@ -253,7 +253,7 @@ export class KlecksPaintHostElement extends HTMLElement {
             return null
         }
 
-        const draft = latestCloudDraft(state)
+        const draft = await this.#latestCloudDraft(state)
         if (!draft) {
             return null
         }
@@ -277,6 +277,49 @@ export class KlecksPaintHostElement extends HTMLElement {
         }
 
         return deserializeStorageProject(result.data.draft.source)
+    }
+
+    async #latestCloudDraft(
+        state: CloudDraftState,
+    ): Promise<CloudDraftSummary | null> {
+        const localDraft = latestCloudDraft(state)
+        const saveKey = state.saveKey
+        if (localDraft || !saveKey) {
+            return localDraft
+        }
+
+        const response = await fetch(this.#draftApiUrl(), {
+            method: "GET",
+            headers: {
+                "X-Oekaki-Save-Key": saveKey,
+            },
+        })
+        const result = (await response.json()) as
+            | {
+                  ok: true
+                  data: { drafts: CloudDraftSummary[] }
+              }
+            | { ok: false; error?: string }
+        if (!response.ok || !result.ok) {
+            throw new Error(
+                result.ok
+                    ? "Klecks cloud draft index load failed"
+                    : result.error,
+            )
+        }
+
+        const nextState: CloudDraftState = {
+            saveKey,
+            drafts: Object.fromEntries(
+                result.data.drafts.map((draft) => [draft.id, draft]),
+            ),
+        }
+        localStorage.setItem(
+            KLECKS_CLOUD_DRAFTS_STORAGE_KEY,
+            JSON.stringify(nextState),
+        )
+
+        return latestCloudDraft(nextState)
     }
 
     async #saveCloudDraft(
