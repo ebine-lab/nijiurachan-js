@@ -149,6 +149,7 @@ export type UpfileMode =
     | "empty"
     | "file-attached"
     | "waiting-axnos"
+    | "waiting-klecks"
     | "waiting-hacchan"
 
 /**
@@ -161,6 +162,8 @@ export interface UpfileStateFlags {
     hasSelectedFile: boolean
     /** アクノスペイントのポップアップ待機中 */
     isAxnosOpen: boolean
+    /** Klecksのポップアップ待機中 */
+    isKlecksOpen: boolean
     /** はっちゃんキャンバス待機中 */
     isHacchanOpen: boolean
     /** 何らかの作業中でリロード等を止めたい */
@@ -185,12 +188,14 @@ export function toUpfileStateFlags(
 ): UpfileStateFlags {
     const hasSelectedFile = mode === "file-attached"
     const isAxnosOpen = mode === "waiting-axnos"
+    const isKlecksOpen = mode === "waiting-klecks"
     const isHacchanOpen = mode === "waiting-hacchan"
     return {
         hasSelectedFile,
         isAxnosOpen,
+        isKlecksOpen,
         isHacchanOpen,
-        isBusy: hasSelectedFile || isAxnosOpen || isHacchanOpen,
+        isBusy: hasSelectedFile || isAxnosOpen || isKlecksOpen || isHacchanOpen,
         isPopupFormCollapsed: extras.isPopupFormCollapsed,
     }
 }
@@ -245,6 +250,7 @@ export type UpfileAction =
     | "image-pasted"
     | "paste-button-clicked"
     | "paint-button-clicked"
+    | "klecks-button-clicked"
     | "hacchan-button-clicked"
     | "clear-button-clicked"
     | "submitted"
@@ -269,6 +275,8 @@ export interface UpfileControlState {
     previewFigure: boolean
     /** アクノスペイントのポップアップウィンドウが開いているかどうか */
     axnosPaintWindow: boolean
+    /** Klecksのポップアップウィンドウが開いているかどうか */
+    klecksPaintWindow: boolean
 }
 
 /** モードで表示or生成する要素 */
@@ -285,6 +293,7 @@ export function getShownControls(mode: UpfileMode): UpfileControlState {
                 baseformInput: false,
                 previewFigure: false,
                 axnosPaintWindow: false,
+                klecksPaintWindow: false,
             }
         case "file-attached":
             return {
@@ -297,6 +306,7 @@ export function getShownControls(mode: UpfileMode): UpfileControlState {
                 baseformInput: false,
                 previewFigure: true,
                 axnosPaintWindow: false,
+                klecksPaintWindow: false,
             }
         case "waiting-axnos":
             return {
@@ -309,6 +319,20 @@ export function getShownControls(mode: UpfileMode): UpfileControlState {
                 baseformInput: false,
                 previewFigure: false,
                 axnosPaintWindow: true,
+                klecksPaintWindow: false,
+            }
+        case "waiting-klecks":
+            return {
+                upfileInput: false,
+                paintButton: false,
+                pasteButton: false,
+                clearButton: true,
+                hacchanButton: false,
+                oejsCanvas: false,
+                baseformInput: false,
+                previewFigure: false,
+                axnosPaintWindow: false,
+                klecksPaintWindow: true,
             }
         case "waiting-hacchan":
             return {
@@ -321,6 +345,7 @@ export function getShownControls(mode: UpfileMode): UpfileControlState {
                 baseformInput: true,
                 previewFigure: false,
                 axnosPaintWindow: false,
+                klecksPaintWindow: false,
             }
     }
 }
@@ -340,6 +365,8 @@ export function nextMode(mode: UpfileMode, action: UpfileAction): UpfileMode {
                     return "file-attached"
                 case "paint-button-clicked":
                     return "waiting-axnos"
+                case "klecks-button-clicked":
+                    return "waiting-klecks"
                 case "hacchan-button-clicked":
                     return "waiting-hacchan"
                 default:
@@ -352,10 +379,22 @@ export function nextMode(mode: UpfileMode, action: UpfileAction): UpfileMode {
                     return "empty"
                 case "paint-button-clicked":
                     return "waiting-axnos"
+                case "klecks-button-clicked":
+                    return "waiting-klecks"
                 default:
                     return mode
             }
         case "waiting-axnos":
+            switch (action) {
+                case "paint-finished":
+                    return "file-attached"
+                case "clear-button-clicked":
+                case "submitted":
+                    return "empty"
+                default:
+                    return mode
+            }
+        case "waiting-klecks":
             switch (action) {
                 case "paint-finished":
                     return "file-attached"

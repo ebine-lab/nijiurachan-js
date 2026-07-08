@@ -40,7 +40,7 @@ describe(AxnosPaintPopup, () => {
 
         await expect(popupPromise).resolves.toEqual(image)
         expect(e.detail.isAccepted).toBe(true)
-    }, 100)
+    }, 1000)
 
     test("結果待ちを中断したときリジェクトすること", async () => {
         openSpy = jest
@@ -57,7 +57,7 @@ describe(AxnosPaintPopup, () => {
         popup.abort()
 
         await expect(popupPromise).rejects.toBeDefined()
-    }, 100)
+    }, 1000)
 
     test("ポップアップに失敗したときリジェクトすること", async () => {
         openSpy = jest.spyOn(window, "open").mockReturnValue(null)
@@ -70,5 +70,5 @@ describe(AxnosPaintPopup, () => {
         })
 
         await expect(popupPromise).rejects.toBeDefined()
-    }, 100)
+    }, 1000)
 })

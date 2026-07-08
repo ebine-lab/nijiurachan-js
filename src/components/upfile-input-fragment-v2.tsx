@@ -20,7 +20,14 @@ import {
     toUpfileStateFlags,
     toUpfileUiHintFlags,
 } from "#js/pure/upfile"
-import type { IAxnosPaintPopup } from "./types"
+import {
+    abortPaintPopups,
+    isPaintPopupAvailable,
+    type OekakiPaintPopupConfig,
+    resolvePaintPopup,
+    selectedPaintAction,
+} from "./oekaki-paint-popup"
+import type { OekakiTool } from "./types"
 
 /**
  * `upfile-input-v2`要素に外から叩き込むコマンド群。
@@ -31,6 +38,8 @@ export interface UpfileV2Commands {
     clickFileattach(): void
     /** お絵描きボタンが押されたのと等価 (アクノスペイントを起動) */
     clickPaint(): void
+    /** Klecksを起動 */
+    clickKlecks(): void
     /** 貼付ボタンが押されたのと等価 (クリップボードから画像を取り込む) */
     clickPaste(): void
     /** クリアボタンが押されたのと等価 (emptyモードに戻す) */
@@ -65,7 +74,7 @@ export type UpfileInputV2Props = {
  * - はっちゃん用`<button id=oebtnj>` / `<input id=baseform>` / `<figure id=ftbl>`+`<canvas id=oejs>`
  */
 export const makeUpfileInputFragmentV2 = (
-    axnosPaintPopup: IAxnosPaintPopup,
+    paintPopups: OekakiPaintPopupConfig,
 ): FunctionComponent<UpfileInputV2Props> =>
     function UpfileInputFragmentV2(props: UpfileInputV2Props): VNode {
         const [mode, reducerDispatch] = useReducer(nextMode, "empty")
@@ -78,12 +87,12 @@ export const makeUpfileInputFragmentV2 = (
 
         // biome-ignore lint/correctness/useExhaustiveDependencies: listen系は内部closureだが本体はrefs/safeなclosureしか触らないので、props.formの変化時のみ再subscribeすれば十分
         useEffect(() => listenSubmit(props.form), [props.form])
-        // biome-ignore lint/correctness/useExhaustiveDependencies: listenAxnosPaintはmode変化時のcontrols再計算を前提に動くので敢えてmodeをdepsに残す
-        useEffect(listenAxnosPaint, [mode])
         useEffect(
             () => listenPopupFormToggled(props.form, setIsPopupFormCollapsed),
             [props.form],
         )
+        // biome-ignore lint/correctness/useExhaustiveDependencies: unmount cleanup
+        useEffect(() => (): void => abortPaintPopups(paintPopups), [])
         // biome-ignore lint/correctness/useExhaustiveDependencies: onStateChangeの参照変化では再発火しない
         useEffect(() => {
             props.onStateChange?.(
@@ -102,10 +111,13 @@ export const makeUpfileInputFragmentV2 = (
         // 毎レンダ作り直されるので、外から呼ばれたとき最新の値で動くようrefで遅延参照する。
         const dispatchRef = useRef(dispatch)
         dispatchRef.current = dispatch
+        const modeRef = useRef(mode)
+        modeRef.current = mode
         const controlsRef = useRef(controls)
         controlsRef.current = controls
+        const paintPopupGenerationRef = useRef(0)
         // biome-ignore lint/correctness/useExhaustiveDependencies: one-shot on mount (refsで最新参照)
-        useEffect(() => {
+        useLayoutEffect(() => {
             props.bindCommands?.({
                 clickFileattach: () => {
                     if (!controlsRef.current.upfileInput) {
@@ -116,7 +128,17 @@ export const makeUpfileInputFragmentV2 = (
                     }
                     upfileRef.current?.click()
                 },
-                clickPaint: () => dispatchRef.current("paint-button-clicked"),
+                clickPaint: () =>
+                    dispatchRef.current(selectedPaintAction(paintPopups)),
+                clickKlecks: () => {
+                    if (!isPaintPopupAvailable(paintPopups, "klecks")) {
+                        console.warn(
+                            "[upfile-input-v2] clickKlecks: Klecks popup is not configured",
+                        )
+                        return
+                    }
+                    dispatchRef.current("klecks-button-clicked")
+                },
                 clickPaste: () => dispatchRef.current("paste-button-clicked"),
                 clickClear: () => dispatchRef.current("clear-button-clicked"),
             })
@@ -257,35 +279,46 @@ export const makeUpfileInputFragmentV2 = (
             }
         }
 
-        /** アクノスペイントのポップアップを表示したりアクションに変換したりする */
-        function listenAxnosPaint(): undefined | (() => void) {
-            if (controls.axnosPaintWindow) {
-                const promise = axnosPaintPopup.popup(props)
+        /** ポップアップ型のお絵描きツールをクリック操作中に表示する */
+        function openPaint(tool: OekakiTool): void {
+            abortOpenPaint()
+            const generation = paintPopupGenerationRef.current
+            const { popup, fileTool } = resolvePaintPopup(paintPopups, tool)
 
-                promise
-                    .then((image) => {
-                        setImage("oekaki", upfileRef.current, image)
-                        dispatch("paint-finished")
-                    })
-                    .catch((e) => {
-                        console.warn(e)
-                        dispatch("clear-button-clicked")
-                    })
+            popup
+                .popup(props)
+                .then((image) => {
+                    if (paintPopupGenerationRef.current !== generation) {
+                        return
+                    }
+                    setImage(fileTool, upfileRef.current, image)
+                    dispatch("paint-finished")
+                })
+                .catch((e) => {
+                    if (paintPopupGenerationRef.current !== generation) {
+                        return
+                    }
+                    console.warn(e)
+                    dispatch("clear-button-clicked")
+                })
+        }
 
-                return () => axnosPaintPopup.abort()
-            } else {
-                axnosPaintPopup.abort()
-            }
+        function abortOpenPaint(): void {
+            paintPopupGenerationRef.current += 1
+            abortPaintPopups(paintPopups)
         }
 
         /** 各アクションが起きたとき一緒にやる処理 */
         function dispatch(action: UpfileAction): void {
-            onDispatch(action)
+            if (onDispatch(action) === false) {
+                return
+            }
+            modeRef.current = nextMode(modeRef.current, action)
             reducerDispatch(action)
         }
 
         /** 各操作があったら遷移前にやる処理 */
-        function onDispatch(action: UpfileAction): void {
+        function onDispatch(action: UpfileAction): boolean | undefined {
             switch (action) {
                 case "paste-button-clicked":
                     pasteFromClipboard(navigator.clipboard)
@@ -293,6 +326,7 @@ export const makeUpfileInputFragmentV2 = (
                         .catch(console.warn)
                     return
                 case "clear-button-clicked":
+                    abortOpenPaint()
                     if (upfileRef.current) {
                         upfileRef.current.value = ""
                     }
@@ -321,6 +355,7 @@ export const makeUpfileInputFragmentV2 = (
                     )
                     return
                 case "submitted":
+                    abortOpenPaint()
                     // 投稿成功後、再submit時に古いはっちゃん画像を再注入しないよう baseform をクリア。
                     // (clear-button-clicked は通らないので明示)
                     if (baseformRef.current) {
@@ -328,10 +363,34 @@ export const makeUpfileInputFragmentV2 = (
                     }
                     return
                 case "paint-finished":
-                case "paint-button-clicked":
                 case "image-pasted":
                     return
+                case "paint-button-clicked":
+                    if (!canOpenPaint("axnos", action)) {
+                        return false
+                    }
+                    openPaint("axnos")
+                    return
+                case "klecks-button-clicked":
+                    if (!canOpenPaint("klecks", action)) {
+                        return false
+                    }
+                    openPaint("klecks")
+                    return
             }
+        }
+
+        function canOpenPaint(tool: OekakiTool, action: UpfileAction): boolean {
+            if (nextMode(modeRef.current, action) === modeRef.current) {
+                return false
+            }
+            if (!isPaintPopupAvailable(paintPopups, tool)) {
+                console.warn(
+                    `[upfile-input-v2] ${tool} popup is not configured`,
+                )
+                return false
+            }
+            return true
         }
     }
 

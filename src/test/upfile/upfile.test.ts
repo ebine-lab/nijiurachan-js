@@ -12,6 +12,7 @@ describe("Upfileの判定", () => {
         "empty",
         "file-attached",
         "waiting-axnos",
+        "waiting-klecks",
         "waiting-hacchan",
     ] as const
     const actions: UpfileAction[] = [
@@ -20,6 +21,7 @@ describe("Upfileの判定", () => {
         "image-pasted",
         "paste-button-clicked",
         "paint-button-clicked",
+        "klecks-button-clicked",
         "hacchan-button-clicked",
         "clear-button-clicked",
         "submitted",
@@ -35,6 +37,9 @@ describe("Upfileの判定", () => {
         ] as const
         const axnosControls: (keyof UpfileControlState)[] = [
             "axnosPaintWindow",
+        ] as const
+        const klecksControls: (keyof UpfileControlState)[] = [
+            "klecksPaintWindow",
         ] as const
         const hacchanControls: (keyof UpfileControlState)[] = [
             "oejsCanvas",
@@ -71,6 +76,13 @@ describe("Upfileの判定", () => {
             )
         })
 
+        test("waiting-klecksのときはKlecksとクリアボタンが表示されること", () => {
+            const shown = getShownControls("waiting-klecks")
+            expect(listControlNames(shown)).toEqual(
+                new Set(["clearButton", ...klecksControls] as const),
+            )
+        })
+
         test("waiting-hacchanのときははっちゃん関連の要素とクリアボタンが表示されること", () => {
             const shown = getShownControls("waiting-hacchan")
             expect(listControlNames(shown)).toEqual(
@@ -88,12 +100,17 @@ describe("Upfileの判定", () => {
             ["empty", "file-selected", "file-attached"],
             ["empty", "image-pasted", "file-attached"],
             ["empty", "paint-button-clicked", "waiting-axnos"],
+            ["empty", "klecks-button-clicked", "waiting-klecks"],
             ["empty", "hacchan-button-clicked", "waiting-hacchan"],
             ["waiting-axnos", "paint-finished", "file-attached"],
             ["waiting-axnos", "clear-button-clicked", "empty"],
             ["waiting-axnos", "submitted", "empty"],
+            ["waiting-klecks", "paint-finished", "file-attached"],
+            ["waiting-klecks", "clear-button-clicked", "empty"],
+            ["waiting-klecks", "submitted", "empty"],
             ["file-attached", "clear-button-clicked", "empty"],
             ["file-attached", "paint-button-clicked", "waiting-axnos"],
+            ["file-attached", "klecks-button-clicked", "waiting-klecks"],
             ["file-attached", "submitted", "empty"],
             ["waiting-hacchan", "clear-button-clicked", "empty"],
             ["waiting-hacchan", "submitted", "empty"],

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest"
 import { makeUpfileInputFragmentV2 } from "#js/components/index"
-import type { IAxnosPaintPopup } from "#js/components/types"
+import type { IAxnosPaintPopup, IKlecksPaintPopup } from "#js/components/types"
 import { makeUpfileInputV2Element } from "#js/elements/upfile-input-v2"
 import type { UpfileStateFlags, UpfileUiHintFlags } from "#js/pure/upfile"
 
@@ -59,9 +59,14 @@ describe("upfile-input-v2 element", () => {
     }
     type Host = HTMLElement & {
         getLatestEventDetail(name: string): unknown | undefined
+        clickPaint(): void
+        clickKlecks(): void
+        clickClear(): void
     }
     const createHost = (): Host =>
         document.createElement(TAG) as unknown as Host
+    const nextTask = (): Promise<void> =>
+        new Promise((resolve) => setTimeout(resolve, 0))
 
     test("mount直後、getLatestEventDetailがmode=emptyの初期値を同期pullで返す (allowImageReplies=true)", () => {
         const form = document.createElement("form")
@@ -139,6 +144,153 @@ describe("upfile-input-v2 element", () => {
         expect(host.getLatestEventDetail("aimg:upfile-state")).toBeUndefined()
         expect(host.getLatestEventDetail("aimg:upfile-ui-hint")).toBeUndefined()
 
+        form.remove()
+    })
+
+    test("clickPaintは同期的に選択中のお絵描きポップアップを開く", async () => {
+        const axnos: IAxnosPaintPopup = {
+            popup: vi.fn(() => new Promise<Blob>(() => undefined)),
+            abort: vi.fn(),
+        }
+        const klecks: IKlecksPaintPopup = {
+            popup: vi.fn(() => new Promise<Blob>(() => undefined)),
+            abort: vi.fn(),
+        }
+        const SelectedElementClass = makeUpfileInputV2Element(
+            makeUpfileInputFragmentV2({
+                axnos,
+                klecks,
+                getOekakiTool: () => "klecks",
+            }),
+        )
+        const tag = "upfile-input-v2-selected-popup-test"
+        if (!customElements.get(tag)) {
+            customElements.define(tag, SelectedElementClass)
+        }
+
+        const form = document.createElement("form")
+        document.body.appendChild(form)
+        const host = document.createElement(tag) as unknown as Host
+        host.setAttribute("data-allow-type", "file")
+        form.appendChild(host)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        host.clickPaint()
+
+        expect(klecks.popup).toHaveBeenCalledOnce()
+        expect(axnos.popup).not.toHaveBeenCalled()
+
+        host.remove()
+        form.remove()
+    })
+
+    test("clickKlecksはKlecks未設定ならAxnosへfallbackしない", async () => {
+        const axnos: IAxnosPaintPopup = {
+            popup: vi.fn(() => new Promise<Blob>(() => undefined)),
+            abort: vi.fn(),
+        }
+        const NoKlecksElementClass = makeUpfileInputV2Element(
+            makeUpfileInputFragmentV2({
+                axnos,
+                getOekakiTool: () => "axnos",
+            }),
+        )
+        const tag = "upfile-input-v2-no-klecks-command-test"
+        if (!customElements.get(tag)) {
+            customElements.define(tag, NoKlecksElementClass)
+        }
+
+        const form = document.createElement("form")
+        document.body.appendChild(form)
+        const host = document.createElement(tag) as unknown as Host
+        host.setAttribute("data-allow-type", "file")
+        form.appendChild(host)
+        await nextTask()
+
+        host.clickKlecks()
+
+        expect(axnos.popup).not.toHaveBeenCalled()
+
+        host.remove()
+        form.remove()
+    })
+
+    test("お絵描き待ち中のclickPaintは既存popupを開き直さない", async () => {
+        const axnos: IAxnosPaintPopup = {
+            popup: vi.fn(() => new Promise<Blob>(() => undefined)),
+            abort: vi.fn(),
+        }
+        const BusyElementClass = makeUpfileInputV2Element(
+            makeUpfileInputFragmentV2(axnos),
+        )
+        const tag = "upfile-input-v2-busy-paint-command-test"
+        if (!customElements.get(tag)) {
+            customElements.define(tag, BusyElementClass)
+        }
+
+        const form = document.createElement("form")
+        document.body.appendChild(form)
+        const host = document.createElement(tag) as unknown as Host
+        host.setAttribute("data-allow-type", "file")
+        form.appendChild(host)
+        await nextTask()
+
+        host.clickPaint()
+        await nextTask()
+        host.clickPaint()
+
+        expect(axnos.popup).toHaveBeenCalledOnce()
+
+        host.remove()
+        form.remove()
+    })
+
+    test("中断済みpopupの遅延rejectは次のpopupをclearしない", async () => {
+        const warnSpy = vi.spyOn(console, "warn").mockReturnValue(undefined)
+        let rejectFirst!: (reason?: unknown) => void
+        const abortMock = vi.fn()
+        const axnos: IAxnosPaintPopup = {
+            popup: vi.fn(
+                () =>
+                    new Promise<Blob>((_resolve, reject) => {
+                        if (!rejectFirst) {
+                            rejectFirst = reject
+                        }
+                    }),
+            ),
+            abort: abortMock,
+        }
+        const RaceElementClass = makeUpfileInputV2Element(
+            makeUpfileInputFragmentV2(axnos),
+        )
+        const tag = "upfile-input-v2-stale-popup-result-test"
+        if (!customElements.get(tag)) {
+            customElements.define(tag, RaceElementClass)
+        }
+
+        const form = document.createElement("form")
+        document.body.appendChild(form)
+        const host = document.createElement(tag) as unknown as Host
+        host.setAttribute("data-allow-type", "file")
+        form.appendChild(host)
+        await nextTask()
+
+        host.clickPaint()
+        await nextTask()
+        host.clickClear()
+        await nextTask()
+        host.clickPaint()
+        await nextTask()
+        const abortCountBeforeStaleReject = abortMock.mock.calls.length
+
+        rejectFirst(new Error("stale popup aborted"))
+        await nextTask()
+
+        expect(axnos.popup).toHaveBeenCalledTimes(2)
+        expect(abortMock).toHaveBeenCalledTimes(abortCountBeforeStaleReject)
+
+        warnSpy.mockRestore()
+        host.remove()
         form.remove()
     })
 

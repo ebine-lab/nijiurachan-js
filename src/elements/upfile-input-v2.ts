@@ -13,7 +13,7 @@ import type { CustomElementClass } from "./types"
  * v2添付File欄。UIボタン群 (🎨/📋/🗑など) は**内部で描画せず**、外部ツールバーが
  * `aimg:upfile-ui-hint`を購読して自前で描画することを想定した"headless"版。
  * ボタン等が押された時の効果は、host要素に生えた`clickFileattach/clickPaint/
- * clickPaste/clickClear` methodを外から呼んで発動させる。
+ * clickKlecks/clickPaste/clickClear` methodを外から呼んで発動させる。
  */
 export const makeUpfileInputV2Element = (
     UpfileInputV2: FunctionComponent<UpfileInputV2Props>,
@@ -132,6 +132,10 @@ export const makeUpfileInputV2Element = (
             this.#commands?.clickPaint()
         }
 
+        clickKlecks(): void {
+            this.#commands?.clickKlecks()
+        }
+
         clickPaste(): void {
             this.#commands?.clickPaste()
         }
@@ -176,6 +180,7 @@ export const makeUpfileInputV2Element = (
                 // 無駄な通信がいやなのでお絵描き中(アクノス・はっちゃんいずれも)は止める
                 return Boolean(
                     this.#latestStateFlags?.isAxnosOpen ||
+                        this.#latestStateFlags?.isKlecksOpen ||
                         this.#latestStateFlags?.isHacchanOpen,
                 )
             }

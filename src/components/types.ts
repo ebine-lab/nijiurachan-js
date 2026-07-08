@@ -63,7 +63,10 @@ declare global {
     }
 }
 
-/** アクノスペイントのオプション */
+/** お絵描きツール */
+export type OekakiTool = "axnos" | "klecks"
+
+/** お絵描きポップアップのオプション */
 export type AxnosPaintPopupOptions = {
     /** キャンバス幅 */
     canvasWidth: number
@@ -73,6 +76,19 @@ export type AxnosPaintPopupOptions = {
 
 /** アクノスペイントを開く用の部品 */
 export interface IAxnosPaintPopup {
+    /**
+     * ポップアップして結果を待ち受ける
+     * @returns お絵描き画像
+     * @throws クリアボタンでキャンセルされた場合やポップアップが失敗した場合
+     */
+    popup(options: AxnosPaintPopupOptions): Promise<Blob>
+
+    /** 待ち受けをやめる */
+    abort(): void
+}
+
+/** Klecksを開く用の部品 */
+export interface IKlecksPaintPopup {
     /**
      * ポップアップして結果を待ち受ける
      * @returns お絵描き画像
