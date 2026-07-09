@@ -260,19 +260,22 @@ export class KlecksPaintHostElement extends HTMLElement {
             return null
         }
 
-        const response = await fetch(this.#draftApiUrl(draft.id), {
-            method: "GET",
-            headers: {
-                "X-Oekaki-Save-Key": state.saveKey,
-            },
-            signal: cloudDraftTimeoutSignal(CLOUD_DRAFT_LOAD_TIMEOUT_MS),
-        })
-        const result = (await response.json()) as
+        const { response, result } = await cloudDraftFetchJson<
             | {
                   ok: true
                   data: { draft: { source: SerializedKlecksStorageProject } }
               }
             | { ok: false; error?: string }
+        >(
+            this.#draftApiUrl(draft.id),
+            {
+                method: "GET",
+                headers: {
+                    "X-Oekaki-Save-Key": state.saveKey,
+                },
+            },
+            CLOUD_DRAFT_LOAD_TIMEOUT_MS,
+        )
         if (!response.ok || !result.ok) {
             throw new Error(
                 result.ok ? "Klecks cloud draft load failed" : result.error,
@@ -291,19 +294,22 @@ export class KlecksPaintHostElement extends HTMLElement {
             return localDraft
         }
 
-        const response = await fetch(this.#draftApiUrl(), {
-            method: "GET",
-            headers: {
-                "X-Oekaki-Save-Key": saveKey,
-            },
-            signal: cloudDraftTimeoutSignal(CLOUD_DRAFT_LOAD_TIMEOUT_MS),
-        })
-        const result = (await response.json()) as
+        const { response, result } = await cloudDraftFetchJson<
             | {
                   ok: true
                   data: { drafts: CloudDraftSummary[] }
               }
             | { ok: false; error?: string }
+        >(
+            this.#draftApiUrl(),
+            {
+                method: "GET",
+                headers: {
+                    "X-Oekaki-Save-Key": saveKey,
+                },
+            },
+            CLOUD_DRAFT_LOAD_TIMEOUT_MS,
+        )
         if (!response.ok || !result.ok) {
             throw new Error(
                 result.ok
@@ -353,18 +359,21 @@ export class KlecksPaintHostElement extends HTMLElement {
             headers["X-Oekaki-Save-Key"] = state.saveKey
         }
 
-        const response = await fetch(this.#draftApiUrl(), {
-            method: "POST",
-            headers,
-            body: JSON.stringify(body),
-            signal: cloudDraftTimeoutSignal(CLOUD_DRAFT_SAVE_TIMEOUT_MS),
-        })
-        const result = (await response.json()) as
+        const { response, result } = await cloudDraftFetchJson<
             | {
                   ok: true
                   data: { save_key: string; draft: CloudDraftSummary }
               }
             | { ok: false; error?: string }
+        >(
+            this.#draftApiUrl(),
+            {
+                method: "POST",
+                headers,
+                body: JSON.stringify(body),
+            },
+            CLOUD_DRAFT_SAVE_TIMEOUT_MS,
+        )
 
         if (!response.ok || !result.ok) {
             throw new Error(
@@ -460,17 +469,45 @@ function latestCloudDraft(state: CloudDraftState): CloudDraftSummary | null {
     )
 }
 
-function cloudDraftTimeoutSignal(timeoutMs: number): AbortSignal {
+type CloudDraftTimeout = {
+    signal: AbortSignal
+    clear: () => void
+}
+
+async function cloudDraftFetchJson<T>(
+    input: RequestInfo | URL,
+    init: RequestInit,
+    timeoutMs: number,
+): Promise<{ response: Response; result: T }> {
+    const timeout = cloudDraftTimeout(timeoutMs)
+    try {
+        const response = await fetch(input, { ...init, signal: timeout.signal })
+        return {
+            response,
+            result: (await response.json()) as T,
+        }
+    } finally {
+        timeout.clear()
+    }
+}
+
+function cloudDraftTimeout(timeoutMs: number): CloudDraftTimeout {
     const timeout = (
         AbortSignal as { timeout?: (milliseconds: number) => AbortSignal }
     ).timeout
     if (typeof timeout === "function") {
-        return timeout(timeoutMs)
+        return {
+            signal: timeout(timeoutMs),
+            clear: () => undefined,
+        }
     }
 
     const controller = new AbortController()
-    setTimeout(() => controller.abort(), timeoutMs)
-    return controller.signal
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    return {
+        signal: controller.signal,
+        clear: () => clearTimeout(timer),
+    }
 }
 
 function deserializeStorageProject(

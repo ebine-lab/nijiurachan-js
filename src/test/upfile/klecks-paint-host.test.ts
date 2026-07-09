@@ -34,6 +34,12 @@ if (!customElements.get(TAG)) {
 const nextTask = (): Promise<void> =>
     new Promise((resolve) => setTimeout(resolve, 0))
 
+async function flushMicrotasks(count: number = 20): Promise<void> {
+    for (let i = 0; i < count; i++) {
+        await Promise.resolve()
+    }
+}
+
 async function waitUntil(predicate: () => boolean): Promise<void> {
     for (let i = 0; i < 20; i++) {
         if (predicate()) {
@@ -485,6 +491,101 @@ describe(KlecksPaintHostElement, () => {
             layers: [{ name: "Restored" }],
         })
         expect(blankProject).toBeUndefined()
+    })
+
+    test("フォールバックのクラウド下書きタイマーを復元完了後に解除する", async () => {
+        const saveKey = "e".repeat(64)
+        localStorage.setItem(
+            KLECKS_CLOUD_DRAFTS_STORAGE_KEY,
+            JSON.stringify({
+                saveKey,
+                drafts: {
+                    draft_fallback_timeout: {
+                        id: "draft_fallback_timeout",
+                        updated_at: "2026-07-08T00:00:00+00:00",
+                    },
+                },
+            }),
+        )
+        Object.defineProperty(window, "opener", {
+            configurable: true,
+            value: {
+                closed: false,
+                dispatchEvent: vi.fn(),
+            },
+        })
+        fetchSpy = vi.spyOn(window, "fetch").mockResolvedValue({
+            ok: true,
+            json: () =>
+                Promise.resolve({
+                    ok: true,
+                    data: {
+                        draft: {
+                            source: {
+                                id: 1,
+                                projectId: "project-fallback-timeout",
+                                timestamp: 1,
+                                thumbnail: {
+                                    contentType: "image/png",
+                                    size: 9,
+                                    data: btoa("thumbnail"),
+                                },
+                                width: 111,
+                                height: 222,
+                                layers: [],
+                            },
+                        },
+                    },
+                }),
+        } as Response)
+        let restoredProject: unknown
+        mockScriptLoad()
+        window.Klecks = class FakeKlecks {
+            openProject(): void {
+                return
+            }
+
+            getPNG(): Promise<Blob> {
+                return Promise.resolve(new Blob())
+            }
+
+            openStorageProject(project: unknown): Promise<void> {
+                restoredProject = project
+                return Promise.resolve()
+            }
+        }
+
+        const timeoutDescriptor = Object.getOwnPropertyDescriptor(
+            AbortSignal,
+            "timeout",
+        )
+        Object.defineProperty(AbortSignal, "timeout", {
+            configurable: true,
+            value: undefined,
+        })
+        vi.useFakeTimers()
+
+        try {
+            const host = document.createElement(TAG)
+            host.dataset.embedSrc = "embed.js"
+            host.dataset.draftApi = "/api/oekaki-drafts"
+            document.body.appendChild(host)
+            await vi.advanceTimersByTimeAsync(0)
+            await flushMicrotasks()
+
+            expect(fetchSpy).toHaveBeenCalledOnce()
+            expect(restoredProject).toMatchObject({
+                projectId: "project-fallback-timeout",
+            })
+            expect(vi.getTimerCount()).toBe(0)
+        } finally {
+            vi.useRealTimers()
+            if (timeoutDescriptor) {
+                Object.defineProperty(AbortSignal, "timeout", timeoutDescriptor)
+            } else {
+                delete (AbortSignal as { timeout?: unknown }).timeout
+            }
+        }
     })
 
     test("保存キーだけが残っている場合はクラウド下書き一覧から復元する", async () => {

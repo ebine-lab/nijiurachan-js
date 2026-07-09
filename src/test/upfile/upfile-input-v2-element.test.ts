@@ -247,40 +247,45 @@ describe("upfile-input-v2 element", () => {
 
     test("中断済みpopupの遅延rejectは次のpopupをclearしない", async () => {
         const warnSpy = vi.spyOn(console, "warn").mockReturnValue(undefined)
-        let rejectFirst!: (reason?: unknown) => void
-        const abortMock = vi.fn()
-        const axnos: IAxnosPaintPopup = {
-            popup: vi.fn(
-                () =>
-                    new Promise<Blob>((_resolve, reject) => {
-                        if (!rejectFirst) {
-                            rejectFirst = reject
-                        }
-                    }),
-            ),
-            abort: abortMock,
-        }
-        const RaceElementClass = makeUpfileInputV2Element(
-            makeUpfileInputFragmentV2(axnos),
-        )
-        const tag = "upfile-input-v2-stale-popup-result-test"
-        if (!customElements.get(tag)) {
-            customElements.define(tag, RaceElementClass)
-        }
-
-        const form = document.createElement("form")
-        document.body.appendChild(form)
-        const host = document.createElement(tag) as unknown as Host
-        host.setAttribute("data-allow-type", "file")
-        form.appendChild(host)
-        await nextTask()
+        let form: HTMLFormElement | undefined
+        let host: Host | undefined
 
         try {
-            host.clickPaint()
+            let rejectFirst!: (reason?: unknown) => void
+            const abortMock = vi.fn()
+            const axnos: IAxnosPaintPopup = {
+                popup: vi.fn(
+                    () =>
+                        new Promise<Blob>((_resolve, reject) => {
+                            if (!rejectFirst) {
+                                rejectFirst = reject
+                            }
+                        }),
+                ),
+                abort: abortMock,
+            }
+            const RaceElementClass = makeUpfileInputV2Element(
+                makeUpfileInputFragmentV2(axnos),
+            )
+            const tag = "upfile-input-v2-stale-popup-result-test"
+            if (!customElements.get(tag)) {
+                customElements.define(tag, RaceElementClass)
+            }
+
+            const formElement = document.createElement("form")
+            form = formElement
+            document.body.appendChild(formElement)
+            const hostElement = document.createElement(tag) as unknown as Host
+            host = hostElement
+            hostElement.setAttribute("data-allow-type", "file")
+            formElement.appendChild(hostElement)
             await nextTask()
-            host.clickClear()
+
+            hostElement.clickPaint()
             await nextTask()
-            host.clickPaint()
+            hostElement.clickClear()
+            await nextTask()
+            hostElement.clickPaint()
             await nextTask()
             const abortCountBeforeStaleReject = abortMock.mock.calls.length
 
@@ -291,8 +296,8 @@ describe("upfile-input-v2 element", () => {
             expect(abortMock).toHaveBeenCalledTimes(abortCountBeforeStaleReject)
         } finally {
             warnSpy.mockRestore()
-            host.remove()
-            form.remove()
+            host?.remove()
+            form?.remove()
         }
     })
 
