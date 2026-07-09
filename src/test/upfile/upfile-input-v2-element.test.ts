@@ -246,11 +246,12 @@ describe("upfile-input-v2 element", () => {
     })
 
     test("中断済みpopupの遅延rejectは次のpopupをclearしない", async () => {
-        const warnSpy = vi.spyOn(console, "warn").mockReturnValue(undefined)
+        let warnSpy: { mockRestore: () => void } | undefined
         let form: HTMLFormElement | undefined
         let host: Host | undefined
 
         try {
+            warnSpy = vi.spyOn(console, "warn").mockReturnValue(undefined)
             let rejectFirst!: (reason?: unknown) => void
             const abortMock = vi.fn()
             const axnos: IAxnosPaintPopup = {
@@ -295,7 +296,7 @@ describe("upfile-input-v2 element", () => {
             expect(axnos.popup).toHaveBeenCalledTimes(2)
             expect(abortMock).toHaveBeenCalledTimes(abortCountBeforeStaleReject)
         } finally {
-            warnSpy.mockRestore()
+            warnSpy?.mockRestore()
             host?.remove()
             form?.remove()
         }
