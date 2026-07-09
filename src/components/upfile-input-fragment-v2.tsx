@@ -92,7 +92,7 @@ export const makeUpfileInputFragmentV2 = (
             [props.form],
         )
         // biome-ignore lint/correctness/useExhaustiveDependencies: unmount cleanup
-        useEffect(() => (): void => abortPaintPopups(paintPopups), [])
+        useEffect(() => (): void => abortOpenPaint(), [])
         // biome-ignore lint/correctness/useExhaustiveDependencies: onStateChangeの参照変化では再発火しない
         useEffect(() => {
             props.onStateChange?.(

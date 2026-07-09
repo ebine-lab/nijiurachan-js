@@ -246,52 +246,60 @@ describe("upfile-input-v2 element", () => {
     })
 
     test("中断済みpopupの遅延rejectは次のpopupをclearしない", async () => {
-        const warnSpy = vi.spyOn(console, "warn").mockReturnValue(undefined)
-        let rejectFirst!: (reason?: unknown) => void
-        const abortMock = vi.fn()
-        const axnos: IAxnosPaintPopup = {
-            popup: vi.fn(
-                () =>
-                    new Promise<Blob>((_resolve, reject) => {
-                        if (!rejectFirst) {
-                            rejectFirst = reject
-                        }
-                    }),
-            ),
-            abort: abortMock,
+        let warnSpy: { mockRestore: () => void } | undefined
+        let form: HTMLFormElement | undefined
+        let host: Host | undefined
+
+        try {
+            warnSpy = vi.spyOn(console, "warn").mockReturnValue(undefined)
+            let rejectFirst!: (reason?: unknown) => void
+            const abortMock = vi.fn()
+            const axnos: IAxnosPaintPopup = {
+                popup: vi.fn(
+                    () =>
+                        new Promise<Blob>((_resolve, reject) => {
+                            if (!rejectFirst) {
+                                rejectFirst = reject
+                            }
+                        }),
+                ),
+                abort: abortMock,
+            }
+            const RaceElementClass = makeUpfileInputV2Element(
+                makeUpfileInputFragmentV2(axnos),
+            )
+            const tag = "upfile-input-v2-stale-popup-result-test"
+            if (!customElements.get(tag)) {
+                customElements.define(tag, RaceElementClass)
+            }
+
+            const formElement = document.createElement("form")
+            form = formElement
+            document.body.appendChild(formElement)
+            const hostElement = document.createElement(tag) as unknown as Host
+            host = hostElement
+            hostElement.setAttribute("data-allow-type", "file")
+            formElement.appendChild(hostElement)
+            await nextTask()
+
+            hostElement.clickPaint()
+            await nextTask()
+            hostElement.clickClear()
+            await nextTask()
+            hostElement.clickPaint()
+            await nextTask()
+            const abortCountBeforeStaleReject = abortMock.mock.calls.length
+
+            rejectFirst(new Error("stale popup aborted"))
+            await nextTask()
+
+            expect(axnos.popup).toHaveBeenCalledTimes(2)
+            expect(abortMock).toHaveBeenCalledTimes(abortCountBeforeStaleReject)
+        } finally {
+            warnSpy?.mockRestore()
+            host?.remove()
+            form?.remove()
         }
-        const RaceElementClass = makeUpfileInputV2Element(
-            makeUpfileInputFragmentV2(axnos),
-        )
-        const tag = "upfile-input-v2-stale-popup-result-test"
-        if (!customElements.get(tag)) {
-            customElements.define(tag, RaceElementClass)
-        }
-
-        const form = document.createElement("form")
-        document.body.appendChild(form)
-        const host = document.createElement(tag) as unknown as Host
-        host.setAttribute("data-allow-type", "file")
-        form.appendChild(host)
-        await nextTask()
-
-        host.clickPaint()
-        await nextTask()
-        host.clickClear()
-        await nextTask()
-        host.clickPaint()
-        await nextTask()
-        const abortCountBeforeStaleReject = abortMock.mock.calls.length
-
-        rejectFirst(new Error("stale popup aborted"))
-        await nextTask()
-
-        expect(axnos.popup).toHaveBeenCalledTimes(2)
-        expect(abortMock).toHaveBeenCalledTimes(abortCountBeforeStaleReject)
-
-        warnSpy.mockRestore()
-        host.remove()
-        form.remove()
     })
 
     // 注: `<form>の外にmountしたら throw` はjsdomがCE reactionの例外を
