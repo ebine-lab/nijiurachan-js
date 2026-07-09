@@ -285,6 +285,7 @@ describe(KlecksPaintHostElement, () => {
         const [url, init] = fetchCall ?? []
         expect(url).toBe("/api/oekaki-drafts")
         expect(init?.method).toBe("POST")
+        expect(init?.signal).toBeInstanceOf(AbortSignal)
         const body = JSON.parse(String(init?.body))
         expect(body.draft_id).toBe("project-1")
         expect(body.width).toBe(123)
@@ -473,6 +474,7 @@ describe(KlecksPaintHostElement, () => {
         expect(fetchSpy).toHaveBeenCalledOnce()
         const [url, init] = fetchSpy.mock.calls[0] ?? []
         expect(url).toBe("/api/oekaki-drafts/draft_api")
+        expect(init?.signal).toBeInstanceOf(AbortSignal)
         expect(
             (init?.headers as Record<string, string>)["X-Oekaki-Save-Key"],
         ).toBe(saveKey)
@@ -589,10 +591,12 @@ describe(KlecksPaintHostElement, () => {
         const [indexUrl, indexInit] = fetchSpy.mock.calls[0] ?? []
         const [draftUrl, draftInit] = fetchSpy.mock.calls[1] ?? []
         expect(indexUrl).toBe("/api/oekaki-drafts")
+        expect(indexInit?.signal).toBeInstanceOf(AbortSignal)
         expect(
             (indexInit?.headers as Record<string, string>)["X-Oekaki-Save-Key"],
         ).toBe(saveKey)
         expect(draftUrl).toBe("/api/oekaki-drafts/draft_from_index")
+        expect(draftInit?.signal).toBeInstanceOf(AbortSignal)
         expect(
             (draftInit?.headers as Record<string, string>)["X-Oekaki-Save-Key"],
         ).toBe(saveKey)

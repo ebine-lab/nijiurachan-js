@@ -275,23 +275,25 @@ describe("upfile-input-v2 element", () => {
         form.appendChild(host)
         await nextTask()
 
-        host.clickPaint()
-        await nextTask()
-        host.clickClear()
-        await nextTask()
-        host.clickPaint()
-        await nextTask()
-        const abortCountBeforeStaleReject = abortMock.mock.calls.length
+        try {
+            host.clickPaint()
+            await nextTask()
+            host.clickClear()
+            await nextTask()
+            host.clickPaint()
+            await nextTask()
+            const abortCountBeforeStaleReject = abortMock.mock.calls.length
 
-        rejectFirst(new Error("stale popup aborted"))
-        await nextTask()
+            rejectFirst(new Error("stale popup aborted"))
+            await nextTask()
 
-        expect(axnos.popup).toHaveBeenCalledTimes(2)
-        expect(abortMock).toHaveBeenCalledTimes(abortCountBeforeStaleReject)
-
-        warnSpy.mockRestore()
-        host.remove()
-        form.remove()
+            expect(axnos.popup).toHaveBeenCalledTimes(2)
+            expect(abortMock).toHaveBeenCalledTimes(abortCountBeforeStaleReject)
+        } finally {
+            warnSpy.mockRestore()
+            host.remove()
+            form.remove()
+        }
     })
 
     // 注: `<form>の外にmountしたら throw` はjsdomがCE reactionの例外を

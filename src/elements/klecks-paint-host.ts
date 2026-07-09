@@ -33,6 +33,8 @@ declare global {
 }
 
 export const KLECKS_CLOUD_DRAFTS_STORAGE_KEY = "aimg-klecks-cloud-drafts"
+const CLOUD_DRAFT_LOAD_TIMEOUT_MS = 10_000
+const CLOUD_DRAFT_SAVE_TIMEOUT_MS = 15_000
 
 type SerializedBlob = {
     contentType: string
@@ -263,6 +265,7 @@ export class KlecksPaintHostElement extends HTMLElement {
             headers: {
                 "X-Oekaki-Save-Key": state.saveKey,
             },
+            signal: cloudDraftTimeoutSignal(CLOUD_DRAFT_LOAD_TIMEOUT_MS),
         })
         const result = (await response.json()) as
             | {
@@ -293,6 +296,7 @@ export class KlecksPaintHostElement extends HTMLElement {
             headers: {
                 "X-Oekaki-Save-Key": saveKey,
             },
+            signal: cloudDraftTimeoutSignal(CLOUD_DRAFT_LOAD_TIMEOUT_MS),
         })
         const result = (await response.json()) as
             | {
@@ -353,6 +357,7 @@ export class KlecksPaintHostElement extends HTMLElement {
             method: "POST",
             headers,
             body: JSON.stringify(body),
+            signal: cloudDraftTimeoutSignal(CLOUD_DRAFT_SAVE_TIMEOUT_MS),
         })
         const result = (await response.json()) as
             | {
@@ -453,6 +458,19 @@ function latestCloudDraft(state: CloudDraftState): CloudDraftSummary | null {
             ),
         )[0] ?? null
     )
+}
+
+function cloudDraftTimeoutSignal(timeoutMs: number): AbortSignal {
+    const timeout = (
+        AbortSignal as { timeout?: (milliseconds: number) => AbortSignal }
+    ).timeout
+    if (typeof timeout === "function") {
+        return timeout(timeoutMs)
+    }
+
+    const controller = new AbortController()
+    setTimeout(() => controller.abort(), timeoutMs)
+    return controller.signal
 }
 
 function deserializeStorageProject(
