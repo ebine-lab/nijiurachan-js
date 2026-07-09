@@ -40,6 +40,18 @@ declare global {
             popupId: string
             /** 描き終えた画像。失敗した場合null */
             image: Blob | null
+            /** Klecksクラウド下書き保存に成功した場合の軽量メタデータ */
+            cloudDraft?: {
+                saveKey: string
+                draft: {
+                    id: string
+                    title?: string
+                    width?: number
+                    height?: number
+                    total_bytes?: number
+                    updated_at?: string
+                }
+            } | null
             /** 親画面でイベントが受け取られたらtrueに設定される */
             isAccepted: boolean
         }>
@@ -63,7 +75,10 @@ declare global {
     }
 }
 
-/** アクノスペイントのオプション */
+/** お絵描きツール */
+export type OekakiTool = "axnos" | "klecks"
+
+/** お絵描きポップアップのオプション */
 export type AxnosPaintPopupOptions = {
     /** キャンバス幅 */
     canvasWidth: number
@@ -73,6 +88,19 @@ export type AxnosPaintPopupOptions = {
 
 /** アクノスペイントを開く用の部品 */
 export interface IAxnosPaintPopup {
+    /**
+     * ポップアップして結果を待ち受ける
+     * @returns お絵描き画像
+     * @throws クリアボタンでキャンセルされた場合やポップアップが失敗した場合
+     */
+    popup(options: AxnosPaintPopupOptions): Promise<Blob>
+
+    /** 待ち受けをやめる */
+    abort(): void
+}
+
+/** Klecksを開く用の部品 */
+export interface IKlecksPaintPopup {
     /**
      * ポップアップして結果を待ち受ける
      * @returns お絵描き画像

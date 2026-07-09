@@ -10,10 +10,11 @@ describe(toUpfileUiHintFlags, () => {
         "empty",
         "file-attached",
         "waiting-axnos",
+        "waiting-klecks",
         "waiting-hacchan",
     ] as const
 
-    // mode × allowImageReplies = 4 × 2 = 8ケース
+    // mode × allowImageReplies = 5 × 2 = 10ケース
     const cases: [UpfileMode, boolean, UpfileUiHintFlags][] = [
         [
             "empty",
@@ -72,6 +73,28 @@ describe(toUpfileUiHintFlags, () => {
         ],
         [
             "waiting-axnos",
+            false,
+            {
+                showAllowImageLabel: true,
+                showUpfileButton: false,
+                showPaintButton: false,
+                showPasteButton: false,
+                showClearButton: true,
+            },
+        ],
+        [
+            "waiting-klecks",
+            true,
+            {
+                showAllowImageLabel: false,
+                showUpfileButton: false,
+                showPaintButton: false,
+                showPasteButton: false,
+                showClearButton: true,
+            },
+        ],
+        [
+            "waiting-klecks",
             false,
             {
                 showAllowImageLabel: true,
