@@ -493,6 +493,107 @@ describe(KlecksPaintHostElement, () => {
         expect(blankProject).toBeUndefined()
     })
 
+    test("Klecks の復元 API が遅れて準備されても白紙を開かず下書きを復元する", async () => {
+        const saveKey = "f".repeat(64)
+        localStorage.setItem(
+            KLECKS_CLOUD_DRAFTS_STORAGE_KEY,
+            JSON.stringify({
+                saveKey,
+                drafts: {
+                    draft_delayed_api: {
+                        id: "draft_delayed_api",
+                        updated_at: "2026-07-10T00:00:00+00:00",
+                    },
+                },
+            }),
+        )
+        Object.defineProperty(window, "opener", {
+            configurable: true,
+            value: {
+                closed: false,
+                dispatchEvent: vi.fn(),
+            },
+        })
+        fetchSpy = vi.spyOn(window, "fetch").mockResolvedValue({
+            ok: true,
+            json: () =>
+                Promise.resolve({
+                    ok: true,
+                    data: {
+                        draft: {
+                            source: {
+                                id: 1,
+                                projectId: "project-delayed-api",
+                                timestamp: 1,
+                                thumbnail: {
+                                    contentType: "image/png",
+                                    size: 9,
+                                    data: btoa("thumbnail"),
+                                },
+                                width: 600,
+                                height: 424,
+                                layers: [
+                                    {
+                                        name: "Restored after readiness",
+                                        isVisible: true,
+                                        opacity: 1,
+                                        mixModeStr: "source-over",
+                                        blob: {
+                                            contentType: "image/png",
+                                            size: 5,
+                                            data: btoa("layer"),
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                }),
+        } as Response)
+        let blankProject: FakeKlecksProject | undefined
+        let restoredProject: unknown
+        let embedReady = false
+        mockScriptLoad()
+        window.Klecks = class FakeKlecks {
+            openStorageProject?: (project: unknown) => Promise<void>
+
+            constructor() {
+                setTimeout(() => {
+                    this.openStorageProject = (
+                        project: unknown,
+                    ): Promise<void> => {
+                        restoredProject = project
+                        return Promise.resolve()
+                    }
+                    embedReady = true
+                }, 0)
+            }
+
+            openProject(nextProject: FakeKlecksProject): void {
+                blankProject = nextProject
+            }
+
+            getPNG(): Promise<Blob> {
+                return Promise.resolve(new Blob())
+            }
+        }
+
+        const host = document.createElement(TAG)
+        host.dataset.embedSrc = "embed.js"
+        host.dataset.draftApi = "/api/oekaki-drafts"
+        document.body.appendChild(host)
+        await waitUntil(() => embedReady)
+        await new Promise((resolve) => setTimeout(resolve, 50))
+
+        expect(restoredProject).toMatchObject({
+            projectId: "project-delayed-api",
+            width: 600,
+            height: 424,
+            layers: [{ name: "Restored after readiness" }],
+        })
+        expect(blankProject).toBeUndefined()
+    })
+
     test("フォールバックのクラウド下書きタイマーを復元完了後に解除する", async () => {
         const saveKey = "e".repeat(64)
         localStorage.setItem(

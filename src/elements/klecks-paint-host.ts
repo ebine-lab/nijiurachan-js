@@ -35,6 +35,7 @@ declare global {
 export const KLECKS_CLOUD_DRAFTS_STORAGE_KEY = "aimg-klecks-cloud-drafts"
 const CLOUD_DRAFT_LOAD_TIMEOUT_MS = 10_000
 const CLOUD_DRAFT_SAVE_TIMEOUT_MS = 15_000
+const KLECKS_RESTORE_READY_POLL_MS = 25
 
 type SerializedBlob = {
     contentType: string
@@ -241,9 +242,12 @@ export class KlecksPaintHostElement extends HTMLElement {
                 return null
             },
         )
-        if (storageProject && typeof klecks.openStorageProject === "function") {
-            await klecks.openStorageProject(storageProject)
-            return
+        if (storageProject) {
+            const openStorageProject = await waitForOpenStorageProject(klecks)
+            if (openStorageProject) {
+                await openStorageProject(storageProject)
+                return
+            }
         }
 
         klecks.openProject(this.#makeInitialProject())
@@ -438,6 +442,22 @@ export class KlecksPaintHostElement extends HTMLElement {
             throw Error("opener already cleared")
         }
     }
+}
+
+async function waitForOpenStorageProject(
+    klecks: KlecksEmbed,
+): Promise<((project: KlecksStorageProject) => Promise<void>) | undefined> {
+    const deadline = Date.now() + CLOUD_DRAFT_LOAD_TIMEOUT_MS
+    while (typeof klecks.openStorageProject !== "function") {
+        if (Date.now() >= deadline) {
+            return undefined
+        }
+        await new Promise<void>((resolve) =>
+            setTimeout(resolve, KLECKS_RESTORE_READY_POLL_MS),
+        )
+    }
+
+    return klecks.openStorageProject.bind(klecks)
 }
 
 async function serializeStorageProject(
