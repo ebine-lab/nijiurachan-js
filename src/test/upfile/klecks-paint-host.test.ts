@@ -594,6 +594,85 @@ describe(KlecksPaintHostElement, () => {
         expect(blankProject).toBeUndefined()
     })
 
+    test("Klecks の復元 API が準備されなければ待機を終えて白紙を一度だけ開く", async () => {
+        const saveKey = "a".repeat(64)
+        localStorage.setItem(
+            KLECKS_CLOUD_DRAFTS_STORAGE_KEY,
+            JSON.stringify({
+                saveKey,
+                drafts: {
+                    draft_missing_api: {
+                        id: "draft_missing_api",
+                        updated_at: "2026-07-10T00:00:00+00:00",
+                    },
+                },
+            }),
+        )
+        Object.defineProperty(window, "opener", {
+            configurable: true,
+            value: {
+                closed: false,
+                dispatchEvent: vi.fn(),
+            },
+        })
+        fetchSpy = vi.spyOn(window, "fetch").mockResolvedValue({
+            ok: true,
+            json: () =>
+                Promise.resolve({
+                    ok: true,
+                    data: {
+                        draft: {
+                            source: {
+                                id: 1,
+                                projectId: "project-missing-api",
+                                timestamp: 1,
+                                thumbnail: {
+                                    contentType: "image/png",
+                                    size: 9,
+                                    data: btoa("thumbnail"),
+                                },
+                                width: 600,
+                                height: 424,
+                                layers: [],
+                            },
+                        },
+                    },
+                }),
+        } as Response)
+        const blankProjects: FakeKlecksProject[] = []
+        mockScriptLoad()
+        window.Klecks = class FakeKlecks {
+            openProject(nextProject: FakeKlecksProject): void {
+                blankProjects.push(nextProject)
+            }
+
+            getPNG(): Promise<Blob> {
+                return Promise.resolve(new Blob())
+            }
+        }
+        vi.useFakeTimers()
+
+        try {
+            const host = document.createElement(TAG)
+            host.dataset.embedSrc = "embed.js"
+            host.dataset.draftApi = "/api/oekaki-drafts"
+            document.body.appendChild(host)
+            await vi.advanceTimersByTimeAsync(0)
+            await flushMicrotasks()
+            await vi.advanceTimersByTimeAsync(10_000)
+            await flushMicrotasks()
+
+            expect(blankProjects).toHaveLength(1)
+            expect(blankProjects[0]).toMatchObject({
+                width: 600,
+                height: 424,
+            })
+            expect(vi.getTimerCount()).toBe(0)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     test("フォールバックのクラウド下書きタイマーを復元完了後に解除する", async () => {
         const saveKey = "e".repeat(64)
         localStorage.setItem(
