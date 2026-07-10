@@ -659,7 +659,13 @@ describe(KlecksPaintHostElement, () => {
             document.body.appendChild(host)
             await vi.advanceTimersByTimeAsync(0)
             await flushMicrotasks()
-            await vi.advanceTimersByTimeAsync(10_000)
+            await vi.advanceTimersByTimeAsync(9_999)
+            await flushMicrotasks()
+
+            expect(blankProjects).toHaveLength(0)
+            expect(vi.getTimerCount()).toBe(1)
+
+            await vi.advanceTimersByTimeAsync(1)
             await flushMicrotasks()
 
             expect(blankProjects).toHaveLength(1)
