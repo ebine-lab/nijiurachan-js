@@ -4,7 +4,7 @@ import type { JukeboxState } from "#js/pure/jukebox"
 
 const BASE = "https://music.nijiurachan.net"
 
-function mockFetch(body: unknown, status = 200): void {
+function mockFetch(body: unknown, status: number = 200): void {
     vi.stubGlobal(
         "fetch",
         vi.fn().mockResolvedValue({

@@ -10,7 +10,7 @@ function jsAliasPlugin(): Plugin {
     return {
         name: "js-alias",
         enforce: "pre",
-        resolveId(source: string) {
+        resolveId(source: string): string | undefined {
             if (!source.startsWith("#js/")) return undefined
             const subpath = source.slice("#js/".length)
             for (const ext of [".ts", ".tsx"]) {

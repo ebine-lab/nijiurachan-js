@@ -133,11 +133,16 @@ describe("playbackOffsetSec", () => {
 })
 
 describe("computeQueueEtaMs", () => {
-    const np = (startedAtMs: number, durationSec: number) => ({
+    const np = (
+        startedAtMs: number,
+        durationSec: number,
+    ): { startedAtMs: number; durationSec: number } => ({
         startedAtMs,
         durationSec,
     })
-    const item = (durationSec: number) => ({ durationSec })
+    const item = (durationSec: number): { durationSec: number } => ({
+        durationSec,
+    })
 
     it("returns [] for an empty queue", () => {
         expect(computeQueueEtaMs(np(0, 100), [], 0)).toEqual([])

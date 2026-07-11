@@ -303,13 +303,13 @@ export function JukeboxUI(props: JukeboxUIProps): VNode {
 
             <form
                 class="jukebox-enqueue-form"
-                onSubmit={(e) => void handleEnqueue(e)}
+                onSubmit={(e: Event) => void handleEnqueue(e)}
             >
                 <input
                     type="url"
                     value={urlInput}
                     placeholder="(YouTube URL 10分未満)"
-                    onInput={(e) =>
+                    onInput={(e: Event) =>
                         setUrlInput((e.target as HTMLInputElement).value)
                     }
                     disabled={submitting || onCooldown}
