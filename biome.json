@@ -1,88 +1,88 @@
 {
-    "$schema": "https://biomejs.dev/schemas/2.3.1/schema.json",
-    "vcs": {
-        "enabled": true,
-        "clientKind": "git",
-        "useIgnoreFile": true
-    },
-    "files": {
-        "includes": [
-            "*.json",
-            "*.ts",
-            "src/**/*.ts",
-            "src/**/*.tsx",
-            "src/**/*.json",
-            "src/**/*.html",
-            "src/**/*.css",
-            "!node_modules"
-        ]
-    },
-    "formatter": {
-        "useEditorconfig": true,
-        "formatWithErrors": true
-    },
-    "linter": {
-        "enabled": true,
-        "rules": {
-            "recommended": true,
-            "nursery": {
-                "useExplicitType": "warn",
-                "noFloatingPromises": "error"
-            },
-            "suspicious": {
-                "noVar": "error"
-            }
-        }
-    },
-    "assist": {
-        "enabled": true,
-        "actions": {
-            "source": {
-                "organizeImports": "on"
-            }
-        }
-    },
-    "javascript": {
-        "formatter": {
-            "enabled": true
-        }
-    },
-    "html": {
-        "formatter": {
-            "enabled": true
-        }
-    },
-    "css": {
-        "formatter": {
-            "enabled": true
-        }
-    },
-    "json": {
-        "formatter": {
-            "enabled": true,
-            "expand": "always"
-        }
-    },
-    "overrides": [
-        {
-            "includes": [
-                "**/*.js"
-            ],
-            "javascript": {
-                "formatter": {
-                    "semicolons": "always"
-                }
-            }
-        },
-        {
-            "includes": [
-                "**/*.{ts,tsx}"
-            ],
-            "javascript": {
-                "formatter": {
-                    "semicolons": "asNeeded"
-                }
-            }
-        }
+  "$schema": "https://biomejs.dev/schemas/2.3.1/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "*.json",
+      "*.ts",
+      "src/**/*.ts",
+      "src/**/*.tsx",
+      "src/**/*.json",
+      "src/**/*.html",
+      "src/**/*.css",
+      "!node_modules"
     ]
+  },
+  "formatter": {
+    "useEditorconfig": true,
+    "formatWithErrors": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "nursery": {
+        "useExplicitType": "warn",
+        "noFloatingPromises": "error"
+      },
+      "suspicious": {
+        "noVar": "error"
+      }
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "enabled": true
+    }
+  },
+  "html": {
+    "formatter": {
+      "enabled": true
+    }
+  },
+  "css": {
+    "formatter": {
+      "enabled": true
+    }
+  },
+  "json": {
+    "formatter": {
+      "enabled": true,
+      "expand": "always"
+    }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "**/*.js"
+      ],
+      "javascript": {
+        "formatter": {
+          "semicolons": "always"
+        }
+      }
+    },
+    {
+      "includes": [
+        "**/*.{ts,tsx}"
+      ],
+      "javascript": {
+        "formatter": {
+          "semicolons": "asNeeded"
+        }
+      }
+    }
+  ]
 }

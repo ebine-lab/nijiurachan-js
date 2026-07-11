@@ -10,18 +10,14 @@ import type { ScopeProps } from "./types"
  * (運用上意味のあるユースケースが出るまでシンプルに保つ)
  */
 export function Scope({ name, children }: ScopeProps): JSX.Element {
-    const parent = useContext(ScopeContext)
-    if (parent !== undefined) {
-        throw new Error(
-            `PreactWrapperV1.Scope: nested scope is not supported (parent="${parent}", attempted="${name}")`,
-        )
-    }
-    if (!name) {
-        throw new Error(
-            "PreactWrapperV1.Scope: name must be a non-empty string",
-        )
-    }
-    return (
-        <ScopeContext.Provider value={name}>{children}</ScopeContext.Provider>
+  const parent = useContext(ScopeContext)
+  if (parent !== undefined) {
+    throw new Error(
+      `PreactWrapperV1.Scope: nested scope is not supported (parent="${parent}", attempted="${name}")`,
     )
+  }
+  if (!name) {
+    throw new Error("PreactWrapperV1.Scope: name must be a non-empty string")
+  }
+  return <ScopeContext.Provider value={name}>{children}</ScopeContext.Provider>
 }

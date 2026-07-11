@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react"
 import {
-    ensureHostListenerFor,
-    getOrCreateHandle,
-    maybeRemoveHostListenerFor,
+  ensureHostListenerFor,
+  getOrCreateHandle,
+  maybeRemoveHostListenerFor,
 } from "./core/registry"
 
 /**
@@ -15,35 +15,35 @@ import {
  *   `declare global`を拡張している範囲で)
  */
 export function useEvent<K extends keyof GlobalEventHandlersEventMap>(
-    fullKey: string,
-    eventName: K,
-    callback: (event: GlobalEventHandlersEventMap[K]) => void,
+  fullKey: string,
+  eventName: K,
+  callback: (event: GlobalEventHandlersEventMap[K]) => void,
 ): void {
-    const cbRef = useRef(callback)
-    cbRef.current = callback
+  const cbRef = useRef(callback)
+  cbRef.current = callback
 
-    useEffect(() => {
-        const handle = getOrCreateHandle(fullKey)
-        const name = eventName as string
+  useEffect(() => {
+    const handle = getOrCreateHandle(fullKey)
+    const name = eventName as string
 
-        const wrapper = (e: Event): void => {
-            cbRef.current(e as GlobalEventHandlersEventMap[K])
-        }
+    const wrapper = (e: Event): void => {
+      cbRef.current(e as GlobalEventHandlersEventMap[K])
+    }
 
-        let set = handle.eventCallbacks.get(name)
-        if (!set) {
-            set = new Set()
-            handle.eventCallbacks.set(name, set)
-        }
-        set.add(wrapper)
-        ensureHostListenerFor(fullKey, name)
+    let set = handle.eventCallbacks.get(name)
+    if (!set) {
+      set = new Set()
+      handle.eventCallbacks.set(name, set)
+    }
+    set.add(wrapper)
+    ensureHostListenerFor(fullKey, name)
 
-        return () => {
-            set?.delete(wrapper)
-            if (set?.size === 0) {
-                handle.eventCallbacks.delete(name)
-            }
-            maybeRemoveHostListenerFor(fullKey, name)
-        }
-    }, [fullKey, eventName])
+    return () => {
+      set?.delete(wrapper)
+      if (set?.size === 0) {
+        handle.eventCallbacks.delete(name)
+      }
+      maybeRemoveHostListenerFor(fullKey, name)
+    }
+  }, [fullKey, eventName])
 }

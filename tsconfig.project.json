@@ -1,36 +1,36 @@
 {
-    // このファイルはtsフォルダ以下で使う共通設定です
-    // includeやtypesを各フォルダにあるtsconfig.jsonで上書きしてください
-    "include": [],
-    "files": [],
-    "compilerOptions": {
-        "lib": [
-            "DOM",
-            "ES2024",
-            "ESNext.Collection"
-        ],
-        "types": [],
-        "composite": true,
-        "rootDir": ".",
-        "outDir": "./dist/types",
-        "target": "esnext",
-        "module": "preserve",
-        "jsx": "react-jsx",
-        "jsxImportSource": "preact",
-        "moduleDetection": "force",
-        "moduleResolution": "bundler",
-        "declarationMap": true,
-        "verbatimModuleSyntax": true,
-        "strict": true,
-        "isolatedModules": true,
-        "libReplacement": false,
-        "noFallthroughCasesInSwitch": true,
-        "noImplicitOverride": true,
-        "noPropertyAccessFromIndexSignature": false,
-        "noUncheckedIndexedAccess": true,
-        "noUncheckedSideEffectImports": true,
-        "noUnusedLocals": true,
-        "noUnusedParameters": false,
-        "skipLibCheck": true
-    }
+  // このファイルはtsフォルダ以下で使う共通設定です
+  // includeやtypesを各フォルダにあるtsconfig.jsonで上書きしてください
+  "include": [],
+  "files": [],
+  "compilerOptions": {
+    "lib": [
+      "DOM",
+      "ES2024",
+      "ESNext.Collection"
+    ],
+    "types": [],
+    "composite": true,
+    "rootDir": ".",
+    "outDir": "./dist/types",
+    "target": "esnext",
+    "module": "preserve",
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "moduleDetection": "force",
+    "moduleResolution": "bundler",
+    "declarationMap": true,
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "isolatedModules": true,
+    "libReplacement": false,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": true,
+    "noUncheckedSideEffectImports": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": false,
+    "skipLibCheck": true
+  }
 }

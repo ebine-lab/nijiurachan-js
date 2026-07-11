@@ -146,11 +146,11 @@ blobで送ってもらうようにしてある。(webpがほしいので。`axno
 
 /** 添付ファイルの受付状況 */
 export type UpfileMode =
-    | "empty"
-    | "file-attached"
-    | "waiting-axnos"
-    | "waiting-klecks"
-    | "waiting-hacchan"
+  | "empty"
+  | "file-attached"
+  | "waiting-axnos"
+  | "waiting-klecks"
+  | "waiting-hacchan"
 
 /**
  * 添付File欄の状態フラグ。
@@ -158,24 +158,24 @@ export type UpfileMode =
  * 送信ボタンの disabled 判定などに使う想定の派生状態。
  */
 export interface UpfileStateFlags {
-    /** ファイルが添付されている (プレビュー表示中) */
-    hasSelectedFile: boolean
-    /** アクノスペイントのポップアップ待機中 */
-    isAxnosOpen: boolean
-    /** Klecksのポップアップ待機中 */
-    isKlecksOpen: boolean
-    /** はっちゃんキャンバス待機中 */
-    isHacchanOpen: boolean
-    /** 何らかの作業中でリロード等を止めたい */
-    isBusy: boolean
-    /** 投稿フォームが折り畳まれている */
-    isPopupFormCollapsed: boolean
+  /** ファイルが添付されている (プレビュー表示中) */
+  hasSelectedFile: boolean
+  /** アクノスペイントのポップアップ待機中 */
+  isAxnosOpen: boolean
+  /** Klecksのポップアップ待機中 */
+  isKlecksOpen: boolean
+  /** はっちゃんキャンバス待機中 */
+  isHacchanOpen: boolean
+  /** 何らかの作業中でリロード等を止めたい */
+  isBusy: boolean
+  /** 投稿フォームが折り畳まれている */
+  isPopupFormCollapsed: boolean
 }
 
 /** toUpfileStateFlags の外部入力 (mode 単独では決まらないもの) */
 export interface UpfileStateExtras {
-    /** 投稿フォームが折り畳まれているかどうか */
-    isPopupFormCollapsed: boolean
+  /** 投稿フォームが折り畳まれているかどうか */
+  isPopupFormCollapsed: boolean
 }
 
 /**
@@ -183,21 +183,21 @@ export interface UpfileStateExtras {
  * 外部購読用に意味を一箇所に集約するための純粋関数。
  */
 export function toUpfileStateFlags(
-    mode: UpfileMode,
-    extras: UpfileStateExtras,
+  mode: UpfileMode,
+  extras: UpfileStateExtras,
 ): UpfileStateFlags {
-    const hasSelectedFile = mode === "file-attached"
-    const isAxnosOpen = mode === "waiting-axnos"
-    const isKlecksOpen = mode === "waiting-klecks"
-    const isHacchanOpen = mode === "waiting-hacchan"
-    return {
-        hasSelectedFile,
-        isAxnosOpen,
-        isKlecksOpen,
-        isHacchanOpen,
-        isBusy: hasSelectedFile || isAxnosOpen || isKlecksOpen || isHacchanOpen,
-        isPopupFormCollapsed: extras.isPopupFormCollapsed,
-    }
+  const hasSelectedFile = mode === "file-attached"
+  const isAxnosOpen = mode === "waiting-axnos"
+  const isKlecksOpen = mode === "waiting-klecks"
+  const isHacchanOpen = mode === "waiting-hacchan"
+  return {
+    hasSelectedFile,
+    isAxnosOpen,
+    isKlecksOpen,
+    isHacchanOpen,
+    isBusy: hasSelectedFile || isAxnosOpen || isKlecksOpen || isHacchanOpen,
+    isPopupFormCollapsed: extras.isPopupFormCollapsed,
+  }
 }
 
 /**
@@ -205,22 +205,22 @@ export function toUpfileStateFlags(
  * v2の`upfile-input-v2`はUIを内部で描画しないので、この型の値をイベントで流すだけ。
  */
 export interface UpfileUiHintFlags {
-    /** 画像添付が許可されていない旨のラベルを出すべきか */
-    showAllowImageLabel: boolean
-    /** ファイル選択ボタンを出すべきか */
-    showUpfileButton: boolean
-    /** お絵描きボタンを出すべきか */
-    showPaintButton: boolean
-    /** 貼付ボタンを出すべきか */
-    showPasteButton: boolean
-    /** クリアボタンを出すべきか */
-    showClearButton: boolean
+  /** 画像添付が許可されていない旨のラベルを出すべきか */
+  showAllowImageLabel: boolean
+  /** ファイル選択ボタンを出すべきか */
+  showUpfileButton: boolean
+  /** お絵描きボタンを出すべきか */
+  showPaintButton: boolean
+  /** 貼付ボタンを出すべきか */
+  showPasteButton: boolean
+  /** クリアボタンを出すべきか */
+  showClearButton: boolean
 }
 
 /** toUpfileUiHintFlagsの外部入力 */
 export interface UpfileUiHintExtras {
-    /** 画像添付を許可するかどうか (falseならお絵描きのみ) */
-    allowImageReplies: boolean
+  /** 画像添付を許可するかどうか (falseならお絵描きのみ) */
+  allowImageReplies: boolean
 }
 
 /**
@@ -229,125 +229,125 @@ export interface UpfileUiHintExtras {
  * 場合の非表示判定・ラベル表示の扱いを吸収する点。
  */
 export function toUpfileUiHintFlags(
-    mode: UpfileMode,
-    extras: UpfileUiHintExtras,
+  mode: UpfileMode,
+  extras: UpfileUiHintExtras,
 ): UpfileUiHintFlags {
-    const controls = getShownControls(mode)
-    const { allowImageReplies } = extras
-    return {
-        showAllowImageLabel: !allowImageReplies,
-        showUpfileButton: allowImageReplies && controls.upfileInput,
-        showPaintButton: controls.paintButton,
-        showPasteButton: allowImageReplies && controls.pasteButton,
-        showClearButton: controls.clearButton,
-    }
+  const controls = getShownControls(mode)
+  const { allowImageReplies } = extras
+  return {
+    showAllowImageLabel: !allowImageReplies,
+    showUpfileButton: allowImageReplies && controls.upfileInput,
+    showPaintButton: controls.paintButton,
+    showPasteButton: allowImageReplies && controls.pasteButton,
+    showClearButton: controls.clearButton,
+  }
 }
 
 /** 添付ファイルorお絵描き関係の操作 */
 export type UpfileAction =
-    | "file-selected"
-    | "paint-finished"
-    | "image-pasted"
-    | "paste-button-clicked"
-    | "paint-button-clicked"
-    | "klecks-button-clicked"
-    | "hacchan-button-clicked"
-    | "clear-button-clicked"
-    | "submitted"
+  | "file-selected"
+  | "paint-finished"
+  | "image-pasted"
+  | "paste-button-clicked"
+  | "paint-button-clicked"
+  | "klecks-button-clicked"
+  | "hacchan-button-clicked"
+  | "clear-button-clicked"
+  | "submitted"
 
 /** 各要素の表示状態。同じtrue/falseでも表示/非表示と生成/削除があって微妙に意味が違うがビュー側に任せる */
 export interface UpfileControlState {
-    /** ファイル選択のinput */
-    upfileInput: boolean
-    /** お絵描きボタン */
-    paintButton: boolean
-    /** 貼付ボタン */
-    pasteButton: boolean
-    /** クリアボタン */
-    clearButton: boolean
-    /** はっちゃん用の隠しボタン */
-    hacchanButton: boolean
-    /** はっちゃん用のキャンバス */
-    oejsCanvas: boolean
-    /** はっちゃん用の隠しフォーム要素 */
-    baseformInput: boolean
-    /** 画像プレビュー */
-    previewFigure: boolean
-    /** アクノスペイントのポップアップウィンドウが開いているかどうか */
-    axnosPaintWindow: boolean
-    /** Klecksのポップアップウィンドウが開いているかどうか */
-    klecksPaintWindow: boolean
+  /** ファイル選択のinput */
+  upfileInput: boolean
+  /** お絵描きボタン */
+  paintButton: boolean
+  /** 貼付ボタン */
+  pasteButton: boolean
+  /** クリアボタン */
+  clearButton: boolean
+  /** はっちゃん用の隠しボタン */
+  hacchanButton: boolean
+  /** はっちゃん用のキャンバス */
+  oejsCanvas: boolean
+  /** はっちゃん用の隠しフォーム要素 */
+  baseformInput: boolean
+  /** 画像プレビュー */
+  previewFigure: boolean
+  /** アクノスペイントのポップアップウィンドウが開いているかどうか */
+  axnosPaintWindow: boolean
+  /** Klecksのポップアップウィンドウが開いているかどうか */
+  klecksPaintWindow: boolean
 }
 
 /** モードで表示or生成する要素 */
 export function getShownControls(mode: UpfileMode): UpfileControlState {
-    switch (mode) {
-        case "empty":
-            return {
-                upfileInput: true,
-                paintButton: true,
-                pasteButton: true,
-                clearButton: false,
-                hacchanButton: true,
-                oejsCanvas: false,
-                baseformInput: false,
-                previewFigure: false,
-                axnosPaintWindow: false,
-                klecksPaintWindow: false,
-            }
-        case "file-attached":
-            return {
-                upfileInput: false,
-                paintButton: false,
-                pasteButton: false,
-                clearButton: true,
-                hacchanButton: false,
-                oejsCanvas: false,
-                baseformInput: false,
-                previewFigure: true,
-                axnosPaintWindow: false,
-                klecksPaintWindow: false,
-            }
-        case "waiting-axnos":
-            return {
-                upfileInput: false,
-                paintButton: false,
-                pasteButton: false,
-                clearButton: true,
-                hacchanButton: false,
-                oejsCanvas: false,
-                baseformInput: false,
-                previewFigure: false,
-                axnosPaintWindow: true,
-                klecksPaintWindow: false,
-            }
-        case "waiting-klecks":
-            return {
-                upfileInput: false,
-                paintButton: false,
-                pasteButton: false,
-                clearButton: true,
-                hacchanButton: false,
-                oejsCanvas: false,
-                baseformInput: false,
-                previewFigure: false,
-                axnosPaintWindow: false,
-                klecksPaintWindow: true,
-            }
-        case "waiting-hacchan":
-            return {
-                upfileInput: false,
-                paintButton: false,
-                pasteButton: false,
-                clearButton: true,
-                hacchanButton: true,
-                oejsCanvas: true,
-                baseformInput: true,
-                previewFigure: false,
-                axnosPaintWindow: false,
-                klecksPaintWindow: false,
-            }
-    }
+  switch (mode) {
+    case "empty":
+      return {
+        upfileInput: true,
+        paintButton: true,
+        pasteButton: true,
+        clearButton: false,
+        hacchanButton: true,
+        oejsCanvas: false,
+        baseformInput: false,
+        previewFigure: false,
+        axnosPaintWindow: false,
+        klecksPaintWindow: false,
+      }
+    case "file-attached":
+      return {
+        upfileInput: false,
+        paintButton: false,
+        pasteButton: false,
+        clearButton: true,
+        hacchanButton: false,
+        oejsCanvas: false,
+        baseformInput: false,
+        previewFigure: true,
+        axnosPaintWindow: false,
+        klecksPaintWindow: false,
+      }
+    case "waiting-axnos":
+      return {
+        upfileInput: false,
+        paintButton: false,
+        pasteButton: false,
+        clearButton: true,
+        hacchanButton: false,
+        oejsCanvas: false,
+        baseformInput: false,
+        previewFigure: false,
+        axnosPaintWindow: true,
+        klecksPaintWindow: false,
+      }
+    case "waiting-klecks":
+      return {
+        upfileInput: false,
+        paintButton: false,
+        pasteButton: false,
+        clearButton: true,
+        hacchanButton: false,
+        oejsCanvas: false,
+        baseformInput: false,
+        previewFigure: false,
+        axnosPaintWindow: false,
+        klecksPaintWindow: true,
+      }
+    case "waiting-hacchan":
+      return {
+        upfileInput: false,
+        paintButton: false,
+        pasteButton: false,
+        clearButton: true,
+        hacchanButton: true,
+        oejsCanvas: true,
+        baseformInput: true,
+        previewFigure: false,
+        axnosPaintWindow: false,
+        klecksPaintWindow: false,
+      }
+  }
 }
 
 /**
@@ -357,60 +357,60 @@ export function getShownControls(mode: UpfileMode): UpfileControlState {
  * @returns 遷移後のモード
  */
 export function nextMode(mode: UpfileMode, action: UpfileAction): UpfileMode {
-    switch (mode) {
-        case "empty":
-            switch (action) {
-                case "file-selected":
-                case "image-pasted":
-                    return "file-attached"
-                case "paint-button-clicked":
-                    return "waiting-axnos"
-                case "klecks-button-clicked":
-                    return "waiting-klecks"
-                case "hacchan-button-clicked":
-                    return "waiting-hacchan"
-                default:
-                    return mode
-            }
-        case "file-attached":
-            switch (action) {
-                case "clear-button-clicked":
-                case "submitted":
-                    return "empty"
-                case "paint-button-clicked":
-                    return "waiting-axnos"
-                case "klecks-button-clicked":
-                    return "waiting-klecks"
-                default:
-                    return mode
-            }
-        case "waiting-axnos":
-            switch (action) {
-                case "paint-finished":
-                    return "file-attached"
-                case "clear-button-clicked":
-                case "submitted":
-                    return "empty"
-                default:
-                    return mode
-            }
-        case "waiting-klecks":
-            switch (action) {
-                case "paint-finished":
-                    return "file-attached"
-                case "clear-button-clicked":
-                case "submitted":
-                    return "empty"
-                default:
-                    return mode
-            }
-        case "waiting-hacchan":
-            switch (action) {
-                case "clear-button-clicked":
-                case "submitted":
-                    return "empty"
-                default:
-                    return mode
-            }
-    }
+  switch (mode) {
+    case "empty":
+      switch (action) {
+        case "file-selected":
+        case "image-pasted":
+          return "file-attached"
+        case "paint-button-clicked":
+          return "waiting-axnos"
+        case "klecks-button-clicked":
+          return "waiting-klecks"
+        case "hacchan-button-clicked":
+          return "waiting-hacchan"
+        default:
+          return mode
+      }
+    case "file-attached":
+      switch (action) {
+        case "clear-button-clicked":
+        case "submitted":
+          return "empty"
+        case "paint-button-clicked":
+          return "waiting-axnos"
+        case "klecks-button-clicked":
+          return "waiting-klecks"
+        default:
+          return mode
+      }
+    case "waiting-axnos":
+      switch (action) {
+        case "paint-finished":
+          return "file-attached"
+        case "clear-button-clicked":
+        case "submitted":
+          return "empty"
+        default:
+          return mode
+      }
+    case "waiting-klecks":
+      switch (action) {
+        case "paint-finished":
+          return "file-attached"
+        case "clear-button-clicked":
+        case "submitted":
+          return "empty"
+        default:
+          return mode
+      }
+    case "waiting-hacchan":
+      switch (action) {
+        case "clear-button-clicked":
+        case "submitted":
+          return "empty"
+        default:
+          return mode
+      }
+  }
 }

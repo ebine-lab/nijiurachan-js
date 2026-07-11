@@ -12,8 +12,8 @@ const dir: string = join(import.meta.dir, "..")
 await main()
 
 async function main(): Promise<void> {
-    await generateIndexTs({
-        dir,
-        excludePatterns: ["**/build", "**/test"],
-    })
+  await generateIndexTs({
+    dir,
+    excludePatterns: ["**/build", "**/test"],
+  })
 }

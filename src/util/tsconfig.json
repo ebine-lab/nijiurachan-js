@@ -1,6 +1,6 @@
 {
-    "extends": "../../tsconfig.project.json",
-    "include": [
-        "**/*.ts"
-    ]
+  "extends": "../../tsconfig.project.json",
+  "include": [
+    "**/*.ts"
+  ]
 }

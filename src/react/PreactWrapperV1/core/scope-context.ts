@@ -6,5 +6,5 @@ import { createContext } from "react"
  * `undefined`の場合はスコープなし (fullKey = id そのまま)。
  */
 export const ScopeContext: Context<string | undefined> = createContext<
-    string | undefined
+  string | undefined
 >(undefined)

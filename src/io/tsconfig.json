@@ -1,17 +1,17 @@
 {
-    "extends": "../../tsconfig.project.json",
-    "include": [
-        "**/*.ts"
-    ],
-    "references": [
-        {
-            "path": "../pure"
-        },
-        {
-            "path": "../components"
-        },
-        {
-            "path": "../util"
-        }
-    ]
+  "extends": "../../tsconfig.project.json",
+  "include": [
+    "**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../pure"
+    },
+    {
+      "path": "../components"
+    },
+    {
+      "path": "../util"
+    }
+  ]
 }

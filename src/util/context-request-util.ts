@@ -4,11 +4,11 @@
  */
 
 import type {
-    Context,
-    ContextCallback,
-    ContextType,
-    ContextRequestEvent as IContextRequestEvent,
-    UnknownContext,
+  Context,
+  ContextCallback,
+  ContextType,
+  ContextRequestEvent as IContextRequestEvent,
+  UnknownContext,
 } from "."
 
 /**
@@ -18,48 +18,48 @@ import type {
  * @return 供給があればその値
  */
 export function requestContextFrom<K, V extends object>(
-    elem: EventTarget,
-    key: Context<K, V>,
+  elem: EventTarget,
+  key: Context<K, V>,
 ): V {
-    let value: V | undefined
-    elem.dispatchEvent(
-        new ContextRequestEvent(key, (v) => {
-            value = v
-        }),
-    )
-    if (!value) {
-        throw Error(`No context value provided (synchronously) for ${key}`)
-    }
-    return value
+  let value: V | undefined
+  elem.dispatchEvent(
+    new ContextRequestEvent(key, (v) => {
+      value = v
+    }),
+  )
+  if (!value) {
+    throw Error(`No context value provided (synchronously) for ${key}`)
+  }
+  return value
 }
 
 /** この要素の子にコンテキストを提供する */
 export function provideContextFor<K, V>(
-    elem: HTMLElement,
-    key: Context<K, V>,
-    value: V,
-    options?: AddEventListenerOptions,
+  elem: HTMLElement,
+  key: Context<K, V>,
+  value: V,
+  options?: AddEventListenerOptions,
 ): void {
-    elem.addEventListener(
-        "context-request",
-        (e) => {
-            if (e.context === key) {
-                e.stopPropagation()
-                e.callback(value)
-            }
-        },
-        options,
-    )
+  elem.addEventListener(
+    "context-request",
+    (e) => {
+      if (e.context === key) {
+        e.stopPropagation()
+        e.callback(value)
+      }
+    },
+    options,
+  )
 }
 
 class ContextRequestEvent<T extends UnknownContext>
-    extends Event
-    implements IContextRequestEvent<T>
+  extends Event
+  implements IContextRequestEvent<T>
 {
-    constructor(
-        readonly context: T,
-        readonly callback: ContextCallback<ContextType<T>>,
-    ) {
-        super("context-request", { bubbles: true, composed: true })
-    }
+  constructor(
+    readonly context: T,
+    readonly callback: ContextCallback<ContextType<T>>,
+  ) {
+    super("context-request", { bubbles: true, composed: true })
+  }
 }

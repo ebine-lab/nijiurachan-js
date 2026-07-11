@@ -9,14 +9,14 @@ import type { BuildOnceOptions } from "./tasks/build-entrypoints"
 
 const dir: string = join(import.meta.dir, "..")
 const config: BuildOnceOptions = {
-    dir,
-    throwError: true,
-    buildFor: "production",
+  dir,
+  throwError: true,
+  buildFor: "production",
 }
 
 await buildAndTest(config).catch((e) => {
-    if (!e.message?.includes("tsc") && !e.message?.includes("Tests")) {
-        throw e
-    }
-    process.exit(1)
+  if (!e.message?.includes("tsc") && !e.message?.includes("Tests")) {
+    throw e
+  }
+  process.exit(1)
 })

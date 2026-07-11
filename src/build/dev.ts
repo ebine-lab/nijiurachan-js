@@ -12,17 +12,17 @@ import { watchAndRebuild } from "./tasks/watch-and-rebuild"
 
 const dir: string = join(import.meta.dir, "..")
 const config: BuildOnceOptions = {
-    dir,
-    throwError: false,
-    buildFor: "development",
+  dir,
+  throwError: false,
+  buildFor: "development",
 }
 
 await main()
 
 async function main(): Promise<void> {
-    await buildAndTest(config)
+  await buildAndTest(config)
 
-    console.info("ファイルの変更を待ちます...")
+  console.info("ファイルの変更を待ちます...")
 
-    await watchAndRebuild(dir, () => buildAndTest(config))
+  await watchAndRebuild(dir, () => buildAndTest(config))
 }

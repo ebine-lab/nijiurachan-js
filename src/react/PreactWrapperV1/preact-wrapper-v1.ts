@@ -21,10 +21,10 @@ import { useHost } from "./use-host"
  * 破壊変更が必要になった場合は`PreactWrapperV2`を別ファイル/別exportで新設する。
  */
 export const PreactWrapperV1 = {
-    Scope,
-    CustomElementRegion,
-    useEvent,
-    useEventLatest,
-    useHost,
-    buildFullKey,
+  Scope,
+  CustomElementRegion,
+  useEvent,
+  useEventLatest,
+  useHost,
+  buildFullKey,
 } as const
