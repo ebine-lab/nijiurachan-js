@@ -1,105 +1,105 @@
 {
-    "name": "@nijiurachan/js",
-    "version": "0.0.0",
-    "type": "module",
-    "license": "MPL-2.0",
-    "packageManager": "bun@1.3.11",
-    "private": true,
-    "imports": {
-        "#js/*": [
-            "./src/*.ts",
-            "./src/*.tsx"
-        ]
+  "name": "@nijiurachan/js",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MPL-2.0",
+  "packageManager": "bun@1.3.11",
+  "private": true,
+  "imports": {
+    "#js/*": [
+      "./src/*.ts",
+      "./src/*.tsx"
+    ]
+  },
+  "exports": {
+    "./components": {
+      "types": "./src/components/index.ts",
+      "default": "./src/components/index.ts"
     },
-    "exports": {
-        "./components": {
-            "types": "./src/components/index.ts",
-            "default": "./src/components/index.ts"
-        },
-        "./components/*": {
-            "types": "./src/components/*.tsx",
-            "default": "./src/components/*.tsx"
-        },
-        "./elements": {
-            "types": "./src/elements/index.ts",
-            "default": "./src/elements/index.ts"
-        },
-        "./elements/*": {
-            "types": "./src/elements/*.ts",
-            "default": "./src/elements/*.ts"
-        },
-        "./io": {
-            "types": "./src/io/index.ts",
-            "default": "./src/io/index.ts"
-        },
-        "./io/*": {
-            "types": "./src/io/*.ts",
-            "default": "./src/io/*.ts"
-        },
-        "./pure": {
-            "types": "./src/pure/index.ts",
-            "default": "./src/pure/index.ts"
-        },
-        "./pure/*": {
-            "types": "./src/pure/*.ts",
-            "default": "./src/pure/*.ts"
-        },
-        "./react/PreactWrapperV1": {
-            "types": "./src/react/PreactWrapperV1/index.ts",
-            "default": "./src/react/PreactWrapperV1/index.ts"
-        },
-        "./react/*": {
-            "types": "./src/react/*.ts",
-            "default": "./src/react/*.ts"
-        },
-        "./util": {
-            "types": "./src/util/index.ts",
-            "default": "./src/util/index.ts"
-        },
-        "./util/*": {
-            "types": "./src/util/*.ts",
-            "default": "./src/util/*.ts"
-        }
+    "./components/*": {
+      "types": "./src/components/*.tsx",
+      "default": "./src/components/*.tsx"
     },
-    "scripts": {
-        "postinstall": "bun run src/build/postinstall.ts",
-        "clean": "git clean -fdx .bun node_modules src dist",
-        "dev": "bun run src/build/dev.ts",
-        "watch": "bun run src/build/watch.ts",
-        "build": "bun run once",
-        "once": "bun run src/build/once.ts",
-        "fix": "biome check --fix --unsafe",
-        "format": "biome check --fix",
-        "test": "vitest --run",
-        "tsc": "tsc --build --emitDeclarationOnly",
-        "check": "biome check && bun run tsc"
+    "./elements": {
+      "types": "./src/elements/index.ts",
+      "default": "./src/elements/index.ts"
     },
-    "peerDependencies": {
-        "axnospaint-for-aimg": "github:nijiurachan/axnospaint-for-aimg#1f7a92ac63a8034987392ec615f736581bba1cbc",
-        "lodash-es": "4.18.1",
-        "preact": "^10.28.3",
-        "react": "^19.0.0",
-        "zustand": "^5.0.12"
+    "./elements/*": {
+      "types": "./src/elements/*.ts",
+      "default": "./src/elements/*.ts"
     },
-    "peerDependenciesMeta": {
-        "react": {
-            "optional": true
-        }
+    "./io": {
+      "types": "./src/io/index.ts",
+      "default": "./src/io/index.ts"
     },
-    "devDependencies": {
-        "@biomejs/biome": "2.3.1",
-        "@types/bun": "^1.3.7",
-        "@types/cloudflare-turnstile": "^0.2.2",
-        "@types/jsdom": "^27.0.0",
-        "@types/lodash-es": "4.17.12",
-        "@types/react": "^19.2.14",
-        "jsdom": "^27.4.0",
-        "typescript": "6",
-        "typescript-plugin-css-modules": "^5.2.0",
-        "unplugin": "^3.0.0",
-        "vitest": "^4.0.18"
+    "./io/*": {
+      "types": "./src/io/*.ts",
+      "default": "./src/io/*.ts"
     },
-    "dependencies": {
-        "cookie-store": "4.0.0-next.4"
+    "./pure": {
+      "types": "./src/pure/index.ts",
+      "default": "./src/pure/index.ts"
+    },
+    "./pure/*": {
+      "types": "./src/pure/*.ts",
+      "default": "./src/pure/*.ts"
+    },
+    "./react/PreactWrapperV1": {
+      "types": "./src/react/PreactWrapperV1/index.ts",
+      "default": "./src/react/PreactWrapperV1/index.ts"
+    },
+    "./react/*": {
+      "types": "./src/react/*.ts",
+      "default": "./src/react/*.ts"
+    },
+    "./util": {
+      "types": "./src/util/index.ts",
+      "default": "./src/util/index.ts"
+    },
+    "./util/*": {
+      "types": "./src/util/*.ts",
+      "default": "./src/util/*.ts"
     }
+  },
+  "scripts": {
+    "postinstall": "bun run src/build/postinstall.ts",
+    "clean": "git clean -fdx .bun node_modules src dist",
+    "dev": "bun run src/build/dev.ts",
+    "watch": "bun run src/build/watch.ts",
+    "build": "bun run once",
+    "once": "bun run src/build/once.ts",
+    "fix": "biome check --fix --unsafe",
+    "format": "biome check --fix",
+    "test": "vitest --run",
+    "tsc": "tsc --build --emitDeclarationOnly",
+    "check": "biome check && bun run tsc"
+  },
+  "peerDependencies": {
+    "axnospaint-for-aimg": "github:nijiurachan/axnospaint-for-aimg#1f7a92ac63a8034987392ec615f736581bba1cbc",
+    "lodash-es": "4.18.1",
+    "preact": "^10.28.3",
+    "react": "^19.0.0",
+    "zustand": "^5.0.12"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.1",
+    "@types/bun": "^1.3.7",
+    "@types/cloudflare-turnstile": "^0.2.2",
+    "@types/jsdom": "^27.0.0",
+    "@types/lodash-es": "4.17.12",
+    "@types/react": "^19.2.14",
+    "jsdom": "^27.4.0",
+    "typescript": "6",
+    "typescript-plugin-css-modules": "^5.2.0",
+    "unplugin": "^3.0.0",
+    "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "cookie-store": "4.0.0-next.4"
+  }
 }

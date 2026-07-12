@@ -1,17 +1,17 @@
 {
-    "extends": "../../tsconfig.project.json",
-    "include": [
-        "**/*.ts",
-        "**/*.tsx"
-    ],
-    "references": [],
-    "compilerOptions": {
-        "jsx": "react-jsx",
-        "jsxImportSource": "react",
-        "paths": {
-            "#js/*": [
-                "../*"
-            ]
-        }
+  "extends": "../../tsconfig.project.json",
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "references": [],
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "paths": {
+      "#js/*": [
+        "../*"
+      ]
     }
+  }
 }

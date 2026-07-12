@@ -4,13 +4,13 @@
  */
 
 declare global {
-    interface HTMLElementEventMap {
-        /**
-         * A 'context-request' event can be emitted by any element which desires
-         * a context value to be injected by an external provider.
-         */
-        "context-request": ContextRequestEvent<UnknownContext>
-    }
+  interface HTMLElementEventMap {
+    /**
+     * A 'context-request' event can be emitted by any element which desires
+     * a context value to be injected by an external provider.
+     */
+    "context-request": ContextRequestEvent<UnknownContext>
+  }
 }
 
 /**
@@ -31,19 +31,19 @@ export type UnknownContext = Context<unknown, unknown>
  * A helper type which can extract a Context value type from a Context type
  */
 export type ContextType<T extends UnknownContext> = T extends Context<
-    infer _,
-    infer V
+  infer _,
+  infer V
 >
-    ? V
-    : never
+  ? V
+  : never
 
 /**
  * A callback which is provided by a context requester and is called with the value satisfying the request.
  * This callback can be called multiple times by context providers as the requested value is changed.
  */
 export type ContextCallback<ValueType> = (
-    value: ValueType,
-    unsubscribe?: () => void,
+  value: ValueType,
+  unsubscribe?: () => void,
 ) => void
 
 /**
@@ -57,7 +57,7 @@ export type ContextCallback<ValueType> = (
  * function to the callback which requesters can invoke to indicate they no longer wish to receive these updates.
  */
 export interface ContextRequestEvent<T extends UnknownContext> extends Event {
-    readonly context: T
-    readonly callback: ContextCallback<ContextType<T>>
-    readonly subscribe?: boolean
+  readonly context: T
+  readonly callback: ContextCallback<ContextType<T>>
+  readonly subscribe?: boolean
 }

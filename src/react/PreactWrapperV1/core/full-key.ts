@@ -6,19 +6,19 @@
  * - それ以外: `"<scopeName>:<id>"`
  */
 export function buildFullKey(
-    scopeName: string | undefined,
-    id: string,
+  scopeName: string | undefined,
+  id: string,
 ): string {
-    if (!id) {
-        throw new Error("PreactWrapperV1: id must be a non-empty string")
-    }
-    if (scopeName === undefined) {
-        return id
-    }
-    if (scopeName === "") {
-        throw new Error(
-            "PreactWrapperV1: scopeName must be a non-empty string (scopeを使わない場合はundefinedを渡す)",
-        )
-    }
-    return `${scopeName}:${id}`
+  if (!id) {
+    throw new Error("PreactWrapperV1: id must be a non-empty string")
+  }
+  if (scopeName === undefined) {
+    return id
+  }
+  if (scopeName === "") {
+    throw new Error(
+      "PreactWrapperV1: scopeName must be a non-empty string (scopeを使わない場合はundefinedを渡す)",
+    )
+  }
+  return `${scopeName}:${id}`
 }

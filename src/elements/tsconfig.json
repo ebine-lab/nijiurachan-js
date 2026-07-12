@@ -1,26 +1,26 @@
 {
-    "extends": "../../tsconfig.project.json",
-    "include": [
-        "**/*.ts",
-        "**/*.tsx"
-    ],
-    "references": [
-        {
-            "path": "../pure"
-        },
-        {
-            "path": "../components"
-        },
-        {
-            "path": "../io"
-        },
-        {
-            "path": "../util"
-        }
-    ],
-    "compilerOptions": {
-        "types": [
-            "cloudflare-turnstile"
-        ]
+  "extends": "../../tsconfig.project.json",
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "references": [
+    {
+      "path": "../pure"
+    },
+    {
+      "path": "../components"
+    },
+    {
+      "path": "../io"
+    },
+    {
+      "path": "../util"
     }
+  ],
+  "compilerOptions": {
+    "types": [
+      "cloudflare-turnstile"
+    ]
+  }
 }

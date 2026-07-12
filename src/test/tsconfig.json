@@ -1,23 +1,23 @@
 {
-    "extends": "../../tsconfig.project.json",
-    "include": [
-        "**/*.ts",
-        "**/*.tsx"
-    ],
-    "references": [
-        {
-            "path": "../elements"
-        },
-        {
-            "path": "../io"
-        },
-        {
-            "path": "../pure"
-        }
-    ],
-    "compilerOptions": {
-        "types": [
-            "bun"
-        ]
+  "extends": "../../tsconfig.project.json",
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "references": [
+    {
+      "path": "../elements"
+    },
+    {
+      "path": "../io"
+    },
+    {
+      "path": "../pure"
     }
+  ],
+  "compilerOptions": {
+    "types": [
+      "bun"
+    ]
+  }
 }

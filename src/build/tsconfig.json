@@ -1,12 +1,12 @@
 {
-    "extends": "../../tsconfig.project.json",
-    "include": [
-        "**/*.ts"
-    ],
-    "compilerOptions": {
-        "lib": [
-            "ES2024",
-            "ESNext.Collection"
-        ]
-    }
+  "extends": "../../tsconfig.project.json",
+  "include": [
+    "**/*.ts"
+  ],
+  "compilerOptions": {
+    "lib": [
+      "ES2024",
+      "ESNext.Collection"
+    ]
+  }
 }

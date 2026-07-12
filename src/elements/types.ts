@@ -5,6 +5,6 @@
  * @see https://github.com/webcomponents-cg/community-protocols/blob/main/proposals/on-demand-definitions.md
  */
 export interface CustomElementClass extends CustomElementConstructor {
-    /** カスタムエレメントをレジストリに登録する */
-    define(): void
+  /** カスタムエレメントをレジストリに登録する */
+  define(): void
 }

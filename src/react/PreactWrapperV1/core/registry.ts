@@ -12,28 +12,28 @@ const registry: Map<string, InstanceHandle> = new Map()
 
 /** ハンドル取得。無ければ新規作成する (フックが要素より先に走るケース対応) */
 export function getOrCreateHandle(fullKey: string): InstanceHandle {
-    const existing = registry.get(fullKey)
-    if (existing) {
-        return existing
-    }
-    const handle: InstanceHandle = {
-        fullKey,
-        host: null,
-        hostListeners: new Map(),
-        latestEventDetails: new Map(),
-        eventLatestSubscribers: new Map(),
-        eventCallbacks: new Map(),
-        localHandlers: new Map(),
-        hostSubscribers: new Set(),
-        attachCount: 0,
-    }
-    registry.set(fullKey, handle)
-    return handle
+  const existing = registry.get(fullKey)
+  if (existing) {
+    return existing
+  }
+  const handle: InstanceHandle = {
+    fullKey,
+    host: null,
+    hostListeners: new Map(),
+    latestEventDetails: new Map(),
+    eventLatestSubscribers: new Map(),
+    eventCallbacks: new Map(),
+    localHandlers: new Map(),
+    hostSubscribers: new Set(),
+    attachCount: 0,
+  }
+  registry.set(fullKey, handle)
+  return handle
 }
 
 /** ハンドル取得 (無ければundefined、副作用なし) */
 export function peekHandle(fullKey: string): InstanceHandle | undefined {
-    return registry.get(fullKey)
+  return registry.get(fullKey)
 }
 
 /**
@@ -51,25 +51,25 @@ export function peekHandle(fullKey: string): InstanceHandle | undefined {
  * これを忘れると、古いDOM要素にlistenerが残り続けてリーク + 二重dispatchの原因になる。
  */
 export function attachHost(fullKey: string, host: HTMLElement): void {
-    const handle = getOrCreateHandle(fullKey)
-    const hadPreviousHost = handle.host !== null
-    if (handle.host && handle.host !== host) {
-        for (const [name, listener] of handle.hostListeners) {
-            handle.host.removeEventListener(name, listener)
-        }
-    }
-    handle.latestEventDetails.clear()
-    handle.host = host
-    // host差し替え (detachを挟まずに再attach) 経路では attachCount を増やさない。
-    // 増やすと対応する detachHost が来たときに 0 まで戻らず maybeDeleteHandle が解放できない。
-    if (!hadPreviousHost) {
-        handle.attachCount++
-    }
+  const handle = getOrCreateHandle(fullKey)
+  const hadPreviousHost = handle.host !== null
+  if (handle.host && handle.host !== host) {
     for (const [name, listener] of handle.hostListeners) {
-        host.addEventListener(name, listener)
+      handle.host.removeEventListener(name, listener)
     }
-    notifyHostSubscribers(handle)
-    notifyEventLatestSubscribers(handle)
+  }
+  handle.latestEventDetails.clear()
+  handle.host = host
+  // host差し替え (detachを挟まずに再attach) 経路では attachCount を増やさない。
+  // 増やすと対応する detachHost が来たときに 0 まで戻らず maybeDeleteHandle が解放できない。
+  if (!hadPreviousHost) {
+    handle.attachCount++
+  }
+  for (const [name, listener] of handle.hostListeners) {
+    host.addEventListener(name, listener)
+  }
+  notifyHostSubscribers(handle)
+  notifyEventLatestSubscribers(handle)
 }
 
 /**
@@ -87,22 +87,22 @@ export function attachHost(fullKey: string, host: HTMLElement): void {
  * attach されたままハンドルが解放されてしまう。
  */
 export function detachHost(fullKey: string, host: HTMLElement): void {
-    const handle = registry.get(fullKey)
-    if (!handle) {
-        return
-    }
-    if (handle.host !== host) {
-        return
-    }
-    for (const [name, listener] of handle.hostListeners) {
-        host.removeEventListener(name, listener)
-    }
-    handle.host = null
-    handle.latestEventDetails.clear()
-    notifyHostSubscribers(handle)
-    notifyEventLatestSubscribers(handle)
-    handle.attachCount--
-    maybeDeleteHandle(handle)
+  const handle = registry.get(fullKey)
+  if (!handle) {
+    return
+  }
+  if (handle.host !== host) {
+    return
+  }
+  for (const [name, listener] of handle.hostListeners) {
+    host.removeEventListener(name, listener)
+  }
+  handle.host = null
+  handle.latestEventDetails.clear()
+  notifyHostSubscribers(handle)
+  notifyEventLatestSubscribers(handle)
+  handle.attachCount--
+  maybeDeleteHandle(handle)
 }
 
 /**
@@ -110,16 +110,16 @@ export function detachHost(fullKey: string, host: HTMLElement): void {
  * 戻り値はunsubscribe関数。
  */
 export function subscribeHost(fullKey: string, notify: () => void): () => void {
-    const handle = getOrCreateHandle(fullKey)
-    handle.hostSubscribers.add(notify)
-    return () => {
-        const current = registry.get(fullKey)
-        if (!current) {
-            return
-        }
-        current.hostSubscribers.delete(notify)
-        maybeDeleteHandle(current)
+  const handle = getOrCreateHandle(fullKey)
+  handle.hostSubscribers.add(notify)
+  return () => {
+    const current = registry.get(fullKey)
+    if (!current) {
+      return
     }
+    current.hostSubscribers.delete(notify)
+    maybeDeleteHandle(current)
+  }
 }
 
 /**
@@ -127,19 +127,19 @@ export function subscribeHost(fullKey: string, notify: () => void): () => void {
  * Regionマウントより先にフックが走っても、後で`attachHost`が同じlistenerを付ける。
  */
 export function ensureHostListenerFor(
-    fullKey: string,
-    eventName: string,
+  fullKey: string,
+  eventName: string,
 ): void {
-    const handle = getOrCreateHandle(fullKey)
-    if (handle.hostListeners.has(eventName)) {
-        return
-    }
-    const listener: EventListener = (e: Event) =>
-        dispatchToSubscribers(handle, eventName, e)
-    handle.hostListeners.set(eventName, listener)
-    if (handle.host) {
-        handle.host.addEventListener(eventName, listener)
-    }
+  const handle = getOrCreateHandle(fullKey)
+  if (handle.hostListeners.has(eventName)) {
+    return
+  }
+  const listener: EventListener = (e: Event) =>
+    dispatchToSubscribers(handle, eventName, e)
+  handle.hostListeners.set(eventName, listener)
+  if (handle.host) {
+    handle.host.addEventListener(eventName, listener)
+  }
 }
 
 /**
@@ -147,109 +147,106 @@ export function ensureHostListenerFor(
  * 購読が残っている場合は何もしない。
  */
 export function maybeRemoveHostListenerFor(
-    fullKey: string,
-    eventName: string,
+  fullKey: string,
+  eventName: string,
 ): void {
-    const handle = registry.get(fullKey)
-    if (!handle) {
-        return
-    }
-    if (hasSubscriberFor(handle, eventName)) {
-        return
-    }
-    const listener = handle.hostListeners.get(eventName)
-    if (listener && handle.host) {
-        handle.host.removeEventListener(eventName, listener)
-    }
-    handle.hostListeners.delete(eventName)
-    handle.latestEventDetails.delete(eventName)
-    maybeDeleteHandle(handle)
+  const handle = registry.get(fullKey)
+  if (!handle) {
+    return
+  }
+  if (hasSubscriberFor(handle, eventName)) {
+    return
+  }
+  const listener = handle.hostListeners.get(eventName)
+  if (listener && handle.host) {
+    handle.host.removeEventListener(eventName, listener)
+  }
+  handle.hostListeners.delete(eventName)
+  handle.latestEventDetails.delete(eventName)
+  maybeDeleteHandle(handle)
 }
 
 /** Regionが自身の`localHandlers[eventName]`をregistryに預ける */
 export function setLocalHandler(
-    fullKey: string,
-    eventName: string,
-    handler: (e: Event) => void,
+  fullKey: string,
+  eventName: string,
+  handler: (e: Event) => void,
 ): void {
-    const handle = getOrCreateHandle(fullKey)
-    handle.localHandlers.set(eventName, handler)
-    ensureHostListenerFor(fullKey, eventName)
+  const handle = getOrCreateHandle(fullKey)
+  handle.localHandlers.set(eventName, handler)
+  ensureHostListenerFor(fullKey, eventName)
 }
 
 /** Regionがアンマウント/props変更で自身の`localHandlers[eventName]`を解除 */
 export function clearLocalHandler(fullKey: string, eventName: string): void {
-    const handle = registry.get(fullKey)
-    if (!handle) {
-        return
-    }
-    handle.localHandlers.delete(eventName)
-    maybeRemoveHostListenerFor(fullKey, eventName)
+  const handle = registry.get(fullKey)
+  if (!handle) {
+    return
+  }
+  handle.localHandlers.delete(eventName)
+  maybeRemoveHostListenerFor(fullKey, eventName)
 }
 
 /** テスト用: レジストリを空にする */
 export function __resetRegistryForTest(): void {
-    registry.clear()
+  registry.clear()
 }
 
 // ---- 内部ヘルパ ----
 
 function dispatchToSubscribers(
-    handle: InstanceHandle,
-    eventName: string,
-    e: Event,
+  handle: InstanceHandle,
+  eventName: string,
+  e: Event,
 ): void {
-    if (e instanceof CustomEvent) {
-        handle.latestEventDetails.set(eventName, e.detail)
-    } else {
-        handle.latestEventDetails.set(eventName, undefined)
-    }
+  if (e instanceof CustomEvent) {
+    handle.latestEventDetails.set(eventName, e.detail)
+  } else {
+    handle.latestEventDetails.set(eventName, undefined)
+  }
 
-    const latestSubs = handle.eventLatestSubscribers.get(eventName)
-    if (latestSubs) {
-        for (const notify of latestSubs) {
-            notify()
-        }
+  const latestSubs = handle.eventLatestSubscribers.get(eventName)
+  if (latestSubs) {
+    for (const notify of latestSubs) {
+      notify()
     }
+  }
 
-    const callbacks = handle.eventCallbacks.get(eventName)
-    if (callbacks) {
-        for (const cb of callbacks) {
-            try {
-                cb(e)
-            } catch (err) {
-                console.error(
-                    `PreactWrapperV1: "${eventName}" callback threw`,
-                    err,
-                )
-            }
-        }
+  const callbacks = handle.eventCallbacks.get(eventName)
+  if (callbacks) {
+    for (const cb of callbacks) {
+      try {
+        cb(e)
+      } catch (err) {
+        console.error(`PreactWrapperV1: "${eventName}" callback threw`, err)
+      }
     }
+  }
 
-    const local = handle.localHandlers.get(eventName)
-    if (local) {
-        try {
-            local(e)
-        } catch (err) {
-            console.error(
-                `PreactWrapperV1: local handler for "${eventName}" threw`,
-                err,
-            )
-        }
+  const local = handle.localHandlers.get(eventName)
+  if (local) {
+    try {
+      local(e)
+    } catch (err) {
+      console.error(
+        `PreactWrapperV1: local handler for "${eventName}" threw`,
+        err,
+      )
     }
+  }
 }
 
 function hasSubscriberFor(handle: InstanceHandle, eventName: string): boolean {
-    const latestSize = handle.eventLatestSubscribers.get(eventName)?.size ?? 0
-    const cbSize = handle.eventCallbacks.get(eventName)?.size ?? 0
-    const hasLocal = handle.localHandlers.has(eventName)
-    return latestSize > 0 || cbSize > 0 || hasLocal
+  const latestSize = handle.eventLatestSubscribers.get(eventName)?.size ?? 0
+  const cbSize = handle.eventCallbacks.get(eventName)?.size ?? 0
+  const hasLocal = handle.localHandlers.has(eventName)
+  return latestSize > 0 || cbSize > 0 || hasLocal
 }
 
 function notifyHostSubscribers(handle: InstanceHandle): void {
-    for (const notify of handle.hostSubscribers) {
-        notify()
-    }
+  for (const notify of handle.hostSubscribers) {
+    notify()
+  }
 }
 
 /**
@@ -257,22 +254,22 @@ function notifyHostSubscribers(handle: InstanceHandle): void {
  * `latestEventDetails`を一括クリアした後に呼ぶ用 (個別`dispatchToSubscribers`は対象イベントだけ通知すればよい)。
  */
 function notifyEventLatestSubscribers(handle: InstanceHandle): void {
-    for (const subs of handle.eventLatestSubscribers.values()) {
-        for (const notify of subs) {
-            notify()
-        }
+  for (const subs of handle.eventLatestSubscribers.values()) {
+    for (const notify of subs) {
+      notify()
     }
+  }
 }
 
 function maybeDeleteHandle(handle: InstanceHandle): void {
-    if (
-        handle.attachCount <= 0 &&
-        handle.hostListeners.size === 0 &&
-        handle.eventCallbacks.size === 0 &&
-        handle.eventLatestSubscribers.size === 0 &&
-        handle.localHandlers.size === 0 &&
-        handle.hostSubscribers.size === 0
-    ) {
-        registry.delete(handle.fullKey)
-    }
+  if (
+    handle.attachCount <= 0 &&
+    handle.hostListeners.size === 0 &&
+    handle.eventCallbacks.size === 0 &&
+    handle.eventLatestSubscribers.size === 0 &&
+    handle.localHandlers.size === 0 &&
+    handle.hostSubscribers.size === 0
+  ) {
+    registry.delete(handle.fullKey)
+  }
 }

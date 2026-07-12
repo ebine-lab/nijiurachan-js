@@ -15,17 +15,17 @@ import { peekHandle, subscribeHost } from "./core/registry"
  * 仕様に従い consumer は再レンダされない。
  */
 export function useHost(fullKey: string): HTMLElement | null {
-    const subscribe = useCallback(
-        (notify: () => void) => subscribeHost(fullKey, notify),
-        [fullKey],
-    )
-    const getSnapshot = useCallback(
-        () => peekHandle(fullKey)?.host ?? null,
-        [fullKey],
-    )
-    return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  const subscribe = useCallback(
+    (notify: () => void) => subscribeHost(fullKey, notify),
+    [fullKey],
+  )
+  const getSnapshot = useCallback(
+    () => peekHandle(fullKey)?.host ?? null,
+    [fullKey],
+  )
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 }
 
 function getServerSnapshot(): null {
-    return null
+  return null
 }
