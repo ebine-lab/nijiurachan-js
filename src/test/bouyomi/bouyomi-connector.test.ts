@@ -236,6 +236,37 @@ describe("bouyomi-connector 読み上げ方式", () => {
     expect(saved.port).toBe(50500)
   })
 
+  test("リセットボタンでポート番号が初期値に戻る", async () => {
+    await mountInitialized({
+      alwaysEnabled: true,
+      mode: "bouyomi",
+      port: 50123,
+    })
+
+    const input = document.querySelector<HTMLInputElement>(
+      "[data-bouyomi-port]",
+    )
+    const resetBtn = document.querySelector<HTMLButtonElement>(
+      "[data-bouyomi-port-reset]",
+    )
+    if (!input || !resetBtn) throw new Error("port controls missing")
+    expect(input.value).toBe("50123")
+
+    resetBtn.click()
+
+    expect(input.value).toBe("50080")
+    const saved = JSON.parse(
+      localStorage.getItem("bouyomiSettings") ?? "{}",
+    ) as { port?: number }
+    expect(saved.port).toBe(50080)
+
+    // 送信先も初期ポートに戻っている
+    addReply("r1", "リセット後")
+    await flushMicrotasks()
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "")
+    expect(calledUrl).toContain("localhost:50080/Talk")
+  })
+
   test("mode 未指定の既存設定は bouyomi として扱う(後方互換)", async () => {
     await mountInitialized({
       alwaysEnabled: true,

@@ -566,12 +566,28 @@ export class BouyomiConnectorElement extends HTMLElement {
       max: String(PORT_MAX),
       "data-bouyomi-port": "",
       style:
-        "width:100%;margin-top:2px;padding:4px;font-size:12px;box-sizing:border-box",
+        "flex:1;min-width:0;padding:4px;font-size:12px;box-sizing:border-box",
     })
+    // ポート番号を初期値に戻すボタン
+    const portResetBtn = this.#el(
+      "button",
+      {
+        type: "button",
+        title: `初期値（${DEFAULT_PORT}）に戻す`,
+        "data-bouyomi-port-reset": "",
+        style: "padding:2px 6px;font-size:12px;cursor:pointer",
+      },
+      ["🔄"],
+    )
+    const portRow = this.#el(
+      "div",
+      { style: "display:flex;gap:4px;margin-top:2px" },
+      [portInput, portResetBtn],
+    )
     const portLabel = this.#el(
       "label",
       { style: "display:block;margin-top:6px;font-size:12px" },
-      ["ポート番号", portInput],
+      ["ポート番号", portRow],
     )
 
     // 棒読みちゃんモード専用設定（mode に応じて表示切替）
@@ -699,6 +715,13 @@ export class BouyomiConnectorElement extends HTMLElement {
       const port = this.#normalizePort(Number(portInput.value)) ?? DEFAULT_PORT
       this.#settings.port = port
       portInput.value = String(port)
+      this.#saveSettings()
+    })
+
+    // ポート番号リセットボタン
+    portResetBtn.addEventListener("click", () => {
+      this.#settings.port = DEFAULT_PORT
+      portInput.value = String(DEFAULT_PORT)
       this.#saveSettings()
     })
 
