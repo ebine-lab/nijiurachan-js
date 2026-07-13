@@ -265,38 +265,51 @@ describe("bouyomi-connector 読み上げ方式", () => {
     expect(u.volume).toBe(1)
   })
 
-  test("パネルは下端固定・右端から32pxに配置される", async () => {
-    await mountInitialized({ alwaysEnabled: true, mode: "bouyomi" })
-
-    const panel = document.querySelector<HTMLElement>(".bouyomi-fixed")
-    if (!panel) throw new Error("panel missing")
-
-    expect(panel.style.position).toBe("fixed")
-    expect(panel.style.bottom).toMatch(/^0(px)?$/)
-    expect(panel.style.right).toBe("32px")
-    // content が tab の前（上側）にあり、開いたとき上に展開される
-    expect(panel.firstElementChild?.className).toBe("bouyomi-content")
-    expect(panel.lastElementChild?.className).toBe("bouyomi-tab")
-  })
-
-  test("タブクリックで開閉し、閉時は設定コンテンツを隠す", async () => {
+  test("パネルは下端固定・右端から32px・固定幅で配置される", async () => {
     await mountInitialized({ alwaysEnabled: true, mode: "bouyomi" })
 
     const panel = document.querySelector<HTMLElement>(".bouyomi-fixed")
     const tab = document.querySelector<HTMLElement>(".bouyomi-tab")
-    const content = document.querySelector<HTMLElement>(".bouyomi-content")
-    if (!panel || !tab || !content) throw new Error("panel parts missing")
+    if (!panel || !tab) throw new Error("panel parts missing")
 
+    expect(panel.style.position).toBe("fixed")
+    expect(panel.style.bottom).toMatch(/^0(px)?$/)
+    expect(panel.style.right).toBe("32px")
+    // 非展開時のタブも展開時と同じ横幅（コンテナ幅いっぱい）
+    expect(panel.style.width).toBe("240px")
+    expect(tab.style.width).toBe("100%")
+    // 非展開時の縦幅は32px
+    expect(tab.style.height).toBe("32px")
+    // drawer が tab の前（上側）にあり、開いたとき上に展開される
+    expect(panel.firstElementChild?.hasAttribute("data-bouyomi-drawer")).toBe(
+      true,
+    )
+    expect(panel.lastElementChild?.className).toBe("bouyomi-tab")
+  })
+
+  test("タブクリックで開閉し、下から迫り上がる形で展開される", async () => {
+    await mountInitialized({ alwaysEnabled: true, mode: "bouyomi" })
+
+    const panel = document.querySelector<HTMLElement>(".bouyomi-fixed")
+    const tab = document.querySelector<HTMLElement>(".bouyomi-tab")
+    const drawer = document.querySelector<HTMLElement>("[data-bouyomi-drawer]")
+    if (!panel || !tab || !drawer) throw new Error("panel parts missing")
+
+    // 閉時は max-height:0 で隠れている（max-height 遷移で下から展開する）
     expect(panel.classList.contains("collapsed")).toBe(true)
-    expect(content.style.display).toBe("none")
+    expect(drawer.style.maxHeight).toBe("0px")
+    expect(drawer.style.visibility).toBe("hidden")
+    expect(drawer.style.transition).toContain("max-height")
 
     tab.click()
     expect(panel.classList.contains("collapsed")).toBe(false)
-    expect(content.style.display).toBe("block")
+    expect(drawer.style.maxHeight).toBe("480px")
+    expect(drawer.style.visibility).toBe("visible")
 
     tab.click()
     expect(panel.classList.contains("collapsed")).toBe(true)
-    expect(content.style.display).toBe("none")
+    expect(drawer.style.maxHeight).toBe("0px")
+    expect(drawer.style.visibility).toBe("hidden")
   })
 
   test("タブをドラッグするとパネルが左右に移動し、直後のクリックでは開閉しない", async () => {

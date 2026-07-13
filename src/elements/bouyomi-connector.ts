@@ -38,6 +38,14 @@ const MAX_TEXT_LENGTH = 200
 
 /** パネル初期位置の右端からの距離（px） */
 const PANEL_RIGHT_MARGIN_PX = 32
+/** パネルの横幅 */
+const PANEL_WIDTH_PX = 240
+/** 非展開時（タブのみ）の縦幅 */
+const TAB_HEIGHT_PX = 32
+/** 開閉アニメーションの時間（ms） */
+const PANEL_ANIM_MS = 250
+/** 展開時コンテンツの最大高さ（下から迫り上がるアニメーションの上限） */
+const DRAWER_MAX_HEIGHT_PX = 480
 /** これ未満の移動はドラッグではなくクリックとして扱う（px） */
 const DRAG_THRESHOLD_PX = 4
 /** 開閉タブの矢印（上に展開するので閉時は上向き） */
@@ -658,10 +666,25 @@ export class BouyomiConnectorElement extends HTMLElement {
       header,
       controls,
     ])
-    const content = this.#el("div", { className: "bouyomi-content" }, [body])
+    const content = this.#el(
+      "div",
+      {
+        className: "bouyomi-content",
+        style: "width:100%;box-sizing:border-box",
+      },
+      [body],
+    )
 
-    // 閉じた状態で開始（開くとタブの上方向に展開する）
-    content.style.display = "none"
+    // 開閉アニメーション用の入れ物（閉じた状態で開始）
+    // max-height を 0→上限 に遷移させ、下端アンカーなので下から迫り上がって見える
+    const drawer = this.#el(
+      "div",
+      {
+        "data-bouyomi-drawer": "",
+        style: `overflow:hidden;max-height:0px;visibility:hidden;transition:max-height ${PANEL_ANIM_MS}ms ease,visibility ${PANEL_ANIM_MS}ms`,
+      },
+      [content],
+    )
 
     // タブ（クリックで開閉、ドラッグで左右移動）
     const tabArrow = this.#el("span", { className: "tab-arrow" }, [
@@ -671,20 +694,19 @@ export class BouyomiConnectorElement extends HTMLElement {
       "div",
       {
         className: "bouyomi-tab",
-        style:
-          "writing-mode:horizontal-tb;cursor:pointer;user-select:none;touch-action:none",
+        style: `width:100%;height:${TAB_HEIGHT_PX}px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:4px;writing-mode:horizontal-tb;cursor:pointer;user-select:none;touch-action:none`,
       },
       [tabArrow, "読み上げ"],
     )
 
-    // コンテナ（下端固定・右端から32px。content→tab の順で上に展開する）
+    // コンテナ（下端固定・右端から32px・展開時と同じ横幅。drawer→tab の順で上に展開する）
     this.#panel = this.#el(
       "div",
       {
         className: "bouyomi-fixed collapsed",
-        style: `position:fixed;top:auto;bottom:0;left:auto;right:${PANEL_RIGHT_MARGIN_PX}px;display:flex;flex-direction:column;z-index:9999`,
+        style: `position:fixed;top:auto;bottom:0;left:auto;right:${PANEL_RIGHT_MARGIN_PX}px;width:${PANEL_WIDTH_PX}px;display:flex;flex-direction:column;z-index:9999`,
       },
-      [content, tab],
+      [drawer, tab],
     )
 
     // タブクリックで開閉（ドラッグ直後のクリックは無視）
@@ -694,7 +716,8 @@ export class BouyomiConnectorElement extends HTMLElement {
         return
       }
       const collapsed = this.#panel?.classList.toggle("collapsed") ?? true
-      content.style.display = collapsed ? "none" : "block"
+      drawer.style.maxHeight = collapsed ? "0px" : `${DRAWER_MAX_HEIGHT_PX}px`
+      drawer.style.visibility = collapsed ? "hidden" : "visible"
       tabArrow.textContent = collapsed ? ARROW_COLLAPSED : ARROW_EXPANDED
     })
 
