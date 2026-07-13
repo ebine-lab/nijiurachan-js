@@ -16,8 +16,8 @@ interface BouyomiSettings {
   alwaysEnabled: boolean
   /** 新着時自動スクロール */
   autoScroll: boolean
-  /** 棒読みちゃんHTTPエンドポイント */
-  endpoint: string
+  /** 棒読みちゃんHTTP連携のポート番号 */
+  port: number
   /** 個別ONにしたスレッドID一覧 */
   enabledThreadIds: string[]
   /** 読み上げ方式（bouyomi=棒読みちゃん連携 / browser=ブラウザ内蔵） */
@@ -29,10 +29,20 @@ interface BouyomiSettings {
 }
 
 const STORAGE_KEY = "bouyomiSettings"
-const DEFAULT_ENDPOINT = "http://localhost:50080/Talk"
+const DEFAULT_PORT = 50080
+const PORT_MIN = 1
+const PORT_MAX = 65535
 const INIT_COOLDOWN_MS = 3000
 const QUEUE_INTERVAL_MS = 500
 const MAX_TEXT_LENGTH = 200
+
+/** パネル初期位置の右端からの距離（px） */
+const PANEL_RIGHT_MARGIN_PX = 32
+/** これ未満の移動はドラッグではなくクリックとして扱う（px） */
+const DRAG_THRESHOLD_PX = 4
+/** 開閉タブの矢印（上に展開するので閉時は上向き） */
+const ARROW_COLLAPSED = "▲"
+const ARROW_EXPANDED = "▼"
 
 /** ブラウザ内蔵読み上げの言語 */
 const SPEECH_LANG = "ja-JP"
@@ -69,7 +79,7 @@ export class BouyomiConnectorElement extends HTMLElement {
   #settings: BouyomiSettings = {
     alwaysEnabled: false,
     autoScroll: false,
-    endpoint: DEFAULT_ENDPOINT,
+    port: DEFAULT_PORT,
     enabledThreadIds: [],
     mode: "bouyomi",
     rate: DEFAULT_RATE,
@@ -78,6 +88,12 @@ export class BouyomiConnectorElement extends HTMLElement {
 
   /** UIパネル要素 */
   #panel: HTMLElement | null = null
+
+  /** ドラッグ中の状態（null なら非ドラッグ） */
+  #drag: { startX: number; startLeft: number; moved: boolean } | null = null
+
+  /** ドラッグ直後のクリックで開閉しないようにするフラグ */
+  #suppressNextClick = false
 
   /** クールダウンタイマーID */
   #cooldownTimer: ReturnType<typeof setTimeout> | null = null
@@ -121,6 +137,8 @@ export class BouyomiConnectorElement extends HTMLElement {
 
   disconnectedCallback(): void {
     this.#stopObserver()
+    this.#handleDragEnd()
+    this.#suppressNextClick = false
     this.#panel?.remove()
 
     // タイマーをクリア
@@ -144,11 +162,17 @@ export class BouyomiConnectorElement extends HTMLElement {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) {
-        const parsed = JSON.parse(saved) as Partial<BouyomiSettings>
+        // 旧設定は port の代わりに endpoint(URL文字列) を持つ
+        const parsed = JSON.parse(saved) as Partial<BouyomiSettings> & {
+          endpoint?: string
+        }
         this.#settings = {
           alwaysEnabled: parsed.alwaysEnabled ?? false,
           autoScroll: parsed.autoScroll ?? false,
-          endpoint: parsed.endpoint ?? DEFAULT_ENDPOINT,
+          port:
+            this.#normalizePort(parsed.port) ??
+            this.#portFromEndpoint(parsed.endpoint) ??
+            DEFAULT_PORT,
           enabledThreadIds: parsed.enabledThreadIds ?? [],
           // 旧設定（mode 無し）は棒読みちゃん連携として扱う
           mode: parsed.mode === "browser" ? "browser" : "bouyomi",
@@ -326,9 +350,29 @@ export class BouyomiConnectorElement extends HTMLElement {
     }, QUEUE_INTERVAL_MS)
   }
 
+  /** ポート番号として有効なら整数化して返す。無効なら null */
+  #normalizePort(value: unknown): number | null {
+    if (typeof value !== "number" || !Number.isFinite(value)) return null
+    const port = Math.trunc(value)
+    if (port < PORT_MIN || port > PORT_MAX) return null
+    return port
+  }
+
+  /** 旧設定の endpoint(URL文字列) からポート番号を取り出す（後方互換） */
+  #portFromEndpoint(endpoint: string | undefined): number | null {
+    if (!endpoint) return null
+    try {
+      const url = new URL(endpoint)
+      return url.port ? this.#normalizePort(Number(url.port)) : null
+    } catch {
+      return null
+    }
+  }
+
   /** 棒読みちゃんに送信 */
   #sendToBouyomi(text: string): void {
-    const url = `${this.#settings.endpoint}?text=${encodeURIComponent(text)}`
+    const endpoint = `http://localhost:${this.#settings.port}/Talk`
+    const url = `${endpoint}?text=${encodeURIComponent(text)}`
 
     // no-corsモードで送信（レスポンスは取得不可だが送信は成功）
     fetch(url, { mode: "no-cors" }).catch(() => {
@@ -531,6 +575,28 @@ export class BouyomiConnectorElement extends HTMLElement {
       ["読み上げ方法", modeSelect],
     )
 
+    // 棒読みちゃんモードのポート番号入力
+    const portInput = this.#el("input", {
+      type: "number",
+      min: String(PORT_MIN),
+      max: String(PORT_MAX),
+      "data-bouyomi-port": "",
+      style:
+        "width:100%;margin-top:2px;padding:4px;font-size:12px;box-sizing:border-box",
+    })
+    const portLabel = this.#el(
+      "label",
+      { style: "display:block;margin-top:6px;font-size:12px" },
+      ["ポート番号", portInput],
+    )
+
+    // 棒読みちゃんモード専用設定（mode に応じて表示切替）
+    const bouyomiSettings = this.#el(
+      "div",
+      { "data-bouyomi-http-settings": "", style: "margin-top:4px" },
+      [portLabel],
+    )
+
     // ブラウザ内蔵モードの速度スライダー
     const rateInput = this.#el("input", {
       type: "range",
@@ -578,6 +644,7 @@ export class BouyomiConnectorElement extends HTMLElement {
       alwaysLabel,
       autoScrollLabel,
       modeLabel,
+      bouyomiSettings,
       browserSettings,
     ])
 
@@ -593,22 +660,47 @@ export class BouyomiConnectorElement extends HTMLElement {
     ])
     const content = this.#el("div", { className: "bouyomi-content" }, [body])
 
-    // タブ
-    const tabArrow = this.#el("span", { className: "tab-arrow" }, ["\u25B6"])
-    const tab = this.#el("div", { className: "bouyomi-tab" }, [
-      tabArrow,
-      "読み上げ",
-    ])
+    // 閉じた状態で開始（開くとタブの上方向に展開する）
+    content.style.display = "none"
 
-    // コンテナ
-    this.#panel = this.#el("div", { className: "bouyomi-fixed collapsed" }, [
-      tab,
-      content,
+    // タブ（クリックで開閉、ドラッグで左右移動）
+    const tabArrow = this.#el("span", { className: "tab-arrow" }, [
+      ARROW_COLLAPSED,
     ])
+    const tab = this.#el(
+      "div",
+      {
+        className: "bouyomi-tab",
+        style:
+          "writing-mode:horizontal-tb;cursor:pointer;user-select:none;touch-action:none",
+      },
+      [tabArrow, "読み上げ"],
+    )
 
-    // タブクリックで開閉
+    // コンテナ（下端固定・右端から32px。content→tab の順で上に展開する）
+    this.#panel = this.#el(
+      "div",
+      {
+        className: "bouyomi-fixed collapsed",
+        style: `position:fixed;top:auto;bottom:0;left:auto;right:${PANEL_RIGHT_MARGIN_PX}px;display:flex;flex-direction:column;z-index:9999`,
+      },
+      [content, tab],
+    )
+
+    // タブクリックで開閉（ドラッグ直後のクリックは無視）
     tab.addEventListener("click", () => {
-      this.#panel?.classList.toggle("collapsed")
+      if (this.#suppressNextClick) {
+        this.#suppressNextClick = false
+        return
+      }
+      const collapsed = this.#panel?.classList.toggle("collapsed") ?? true
+      content.style.display = collapsed ? "none" : "block"
+      tabArrow.textContent = collapsed ? ARROW_COLLAPSED : ARROW_EXPANDED
+    })
+
+    // タブのドラッグで左右移動
+    tab.addEventListener("pointerdown", (event) => {
+      this.#startDrag(event)
     })
 
     // トグルボタン
@@ -637,9 +729,18 @@ export class BouyomiConnectorElement extends HTMLElement {
       this.#settings.mode =
         modeSelect.value === "browser" ? "browser" : "bouyomi"
       this.#saveSettings()
-      this.#updateBrowserSettingsVisibility()
+      this.#updateModeSettingsVisibility()
       // 方式切替時は進行中の読み上げを止める
       this.#cancelSpeech()
+    })
+
+    // ポート番号入力（無効値はデフォルトに戻す）
+    portInput.value = String(this.#settings.port)
+    portInput.addEventListener("change", () => {
+      const port = this.#normalizePort(Number(portInput.value)) ?? DEFAULT_PORT
+      this.#settings.port = port
+      portInput.value = String(port)
+      this.#saveSettings()
     })
 
     // 速度スライダー
@@ -666,15 +767,62 @@ export class BouyomiConnectorElement extends HTMLElement {
 
     // 初期状態の表示を更新
     this.#updateToggleButton()
-    this.#updateBrowserSettingsVisibility()
+    this.#updateModeSettingsVisibility()
   }
 
-  /** モードに応じてブラウザ内蔵設定（速度/音量）の表示を切り替える */
-  #updateBrowserSettingsVisibility(): void {
-    const box = this.#panel?.querySelector<HTMLElement>(
+  /** モードに応じて各方式専用設定（ポート / 速度・音量）の表示を切り替える */
+  #updateModeSettingsVisibility(): void {
+    const isBrowser = this.#settings.mode === "browser"
+    const browserBox = this.#panel?.querySelector<HTMLElement>(
       "[data-bouyomi-browser-settings]",
     )
-    if (!box) return
-    box.style.display = this.#settings.mode === "browser" ? "block" : "none"
+    if (browserBox) {
+      browserBox.style.display = isBrowser ? "block" : "none"
+    }
+    const bouyomiBox = this.#panel?.querySelector<HTMLElement>(
+      "[data-bouyomi-http-settings]",
+    )
+    if (bouyomiBox) {
+      bouyomiBox.style.display = isBrowser ? "none" : "block"
+    }
+  }
+
+  /** タブのドラッグを開始 */
+  #startDrag(event: PointerEvent): void {
+    if (!this.#panel) return
+    this.#drag = {
+      startX: event.clientX,
+      startLeft: this.#panel.getBoundingClientRect().left,
+      moved: false,
+    }
+    window.addEventListener("pointermove", this.#handleDragMove)
+    window.addEventListener("pointerup", this.#handleDragEnd)
+  }
+
+  /** ドラッグ中: パネルを左右に追従させる（上下は動かさない） */
+  #handleDragMove = (event: PointerEvent): void => {
+    const drag = this.#drag
+    const panel = this.#panel
+    if (!drag || !panel) return
+
+    const dx = event.clientX - drag.startX
+    // しきい値未満はクリック扱いのまま
+    if (!drag.moved && Math.abs(dx) < DRAG_THRESHOLD_PX) return
+    drag.moved = true
+
+    const maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth)
+    const left = Math.min(maxLeft, Math.max(0, drag.startLeft + dx))
+    panel.style.left = `${left}px`
+    panel.style.right = "auto"
+  }
+
+  /** ドラッグ終了: 移動していたら直後のクリックによる開閉を抑止 */
+  #handleDragEnd = (): void => {
+    if (this.#drag?.moved) {
+      this.#suppressNextClick = true
+    }
+    this.#drag = null
+    window.removeEventListener("pointermove", this.#handleDragMove)
+    window.removeEventListener("pointerup", this.#handleDragEnd)
   }
 }

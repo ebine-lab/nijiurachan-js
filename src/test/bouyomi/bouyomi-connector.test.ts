@@ -166,6 +166,76 @@ describe("bouyomi-connector 読み上げ方式", () => {
     expect(speakSpy).not.toHaveBeenCalled()
   })
 
+  test("port 設定を指定すると送信先ポートに反映される", async () => {
+    await mountInitialized({
+      alwaysEnabled: true,
+      mode: "bouyomi",
+      port: 50123,
+    })
+
+    addReply("r1", "ポート指定")
+    await flushMicrotasks()
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "")
+    expect(calledUrl).toContain("localhost:50123/Talk")
+  })
+
+  test("旧設定の endpoint からポート番号を引き継ぐ(後方互換)", async () => {
+    await mountInitialized({
+      alwaysEnabled: true,
+      mode: "bouyomi",
+      endpoint: "http://localhost:51000/Talk",
+    })
+
+    addReply("r1", "旧設定")
+    await flushMicrotasks()
+
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "")
+    expect(calledUrl).toContain("localhost:51000/Talk")
+  })
+
+  test("無効な port 設定はデフォルトポートにフォールバックする", async () => {
+    await mountInitialized({
+      alwaysEnabled: true,
+      mode: "bouyomi",
+      port: 99999,
+    })
+
+    addReply("r1", "無効ポート")
+    await flushMicrotasks()
+
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "")
+    expect(calledUrl).toContain("localhost:50080/Talk")
+  })
+
+  test("ポート番号入力を変更すると送信先と保存値に反映される", async () => {
+    await mountInitialized({
+      alwaysEnabled: true,
+      mode: "bouyomi",
+    })
+
+    const input = document.querySelector<HTMLInputElement>(
+      "[data-bouyomi-port]",
+    )
+    if (!input) throw new Error("port input missing")
+    expect(input.value).toBe("50080")
+
+    input.value = "50500"
+    input.dispatchEvent(new Event("change"))
+
+    addReply("r1", "変更後")
+    await flushMicrotasks()
+
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "")
+    expect(calledUrl).toContain("localhost:50500/Talk")
+
+    const saved = JSON.parse(
+      localStorage.getItem("bouyomiSettings") ?? "{}",
+    ) as { port?: number }
+    expect(saved.port).toBe(50500)
+  })
+
   test("mode 未指定の既存設定は bouyomi として扱う(後方互換)", async () => {
     await mountInitialized({
       alwaysEnabled: true,
@@ -193,6 +263,88 @@ describe("bouyomi-connector 読み上げ方式", () => {
     // 上限超過は上限値ちょうどに丸められる（RATE_MAX=2 / 音量上限=1）
     expect(u.rate).toBe(2)
     expect(u.volume).toBe(1)
+  })
+
+  test("パネルは下端固定・右端から32pxに配置される", async () => {
+    await mountInitialized({ alwaysEnabled: true, mode: "bouyomi" })
+
+    const panel = document.querySelector<HTMLElement>(".bouyomi-fixed")
+    if (!panel) throw new Error("panel missing")
+
+    expect(panel.style.position).toBe("fixed")
+    expect(panel.style.bottom).toMatch(/^0(px)?$/)
+    expect(panel.style.right).toBe("32px")
+    // content が tab の前（上側）にあり、開いたとき上に展開される
+    expect(panel.firstElementChild?.className).toBe("bouyomi-content")
+    expect(panel.lastElementChild?.className).toBe("bouyomi-tab")
+  })
+
+  test("タブクリックで開閉し、閉時は設定コンテンツを隠す", async () => {
+    await mountInitialized({ alwaysEnabled: true, mode: "bouyomi" })
+
+    const panel = document.querySelector<HTMLElement>(".bouyomi-fixed")
+    const tab = document.querySelector<HTMLElement>(".bouyomi-tab")
+    const content = document.querySelector<HTMLElement>(".bouyomi-content")
+    if (!panel || !tab || !content) throw new Error("panel parts missing")
+
+    expect(panel.classList.contains("collapsed")).toBe(true)
+    expect(content.style.display).toBe("none")
+
+    tab.click()
+    expect(panel.classList.contains("collapsed")).toBe(false)
+    expect(content.style.display).toBe("block")
+
+    tab.click()
+    expect(panel.classList.contains("collapsed")).toBe(true)
+    expect(content.style.display).toBe("none")
+  })
+
+  test("タブをドラッグするとパネルが左右に移動し、直後のクリックでは開閉しない", async () => {
+    await mountInitialized({ alwaysEnabled: true, mode: "bouyomi" })
+
+    const panel = document.querySelector<HTMLElement>(".bouyomi-fixed")
+    const tab = document.querySelector<HTMLElement>(".bouyomi-tab")
+    if (!panel || !tab) throw new Error("panel parts missing")
+
+    // jsdom では getBoundingClientRect().left = 0 のため、+120px の移動になる
+    tab.dispatchEvent(
+      new MouseEvent("pointerdown", { clientX: 500, bubbles: true }),
+    )
+    window.dispatchEvent(new MouseEvent("pointermove", { clientX: 620 }))
+    window.dispatchEvent(new MouseEvent("pointerup"))
+
+    expect(panel.style.left).toBe("120px")
+    expect(panel.style.right).toBe("auto")
+
+    // ドラッグ直後のクリックは開閉しない
+    tab.click()
+    expect(panel.classList.contains("collapsed")).toBe(true)
+
+    // 次のクリックからは通常どおり開閉する
+    tab.click()
+    expect(panel.classList.contains("collapsed")).toBe(false)
+  })
+
+  test("しきい値未満の移動はクリック扱いになりパネルは動かない", async () => {
+    await mountInitialized({ alwaysEnabled: true, mode: "bouyomi" })
+
+    const panel = document.querySelector<HTMLElement>(".bouyomi-fixed")
+    const tab = document.querySelector<HTMLElement>(".bouyomi-tab")
+    if (!panel || !tab) throw new Error("panel parts missing")
+
+    tab.dispatchEvent(
+      new MouseEvent("pointerdown", { clientX: 500, bubbles: true }),
+    )
+    window.dispatchEvent(new MouseEvent("pointermove", { clientX: 502 }))
+    window.dispatchEvent(new MouseEvent("pointerup"))
+
+    // 初期位置（right:32px）から動いていない
+    expect(panel.style.left).toBe("auto")
+    expect(panel.style.right).toBe("32px")
+
+    // クリック扱いなので開閉は動く
+    tab.click()
+    expect(panel.classList.contains("collapsed")).toBe(false)
   })
 
   test("disconnect 時に進行中の読み上げを cancel する", async () => {
