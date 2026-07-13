@@ -36,22 +36,6 @@ const INIT_COOLDOWN_MS = 3000
 const QUEUE_INTERVAL_MS = 500
 const MAX_TEXT_LENGTH = 200
 
-/** パネル初期位置の右端からの距離（px） */
-const PANEL_RIGHT_MARGIN_PX = 32
-/** パネルの横幅 */
-const PANEL_WIDTH_PX = 240
-/** 非展開時（タブのみ）の縦幅 */
-const TAB_HEIGHT_PX = 32
-/** 開閉アニメーションの時間（ms） */
-const PANEL_ANIM_MS = 250
-/** 展開時コンテンツの最大高さ（下から迫り上がるアニメーションの上限） */
-const DRAWER_MAX_HEIGHT_PX = 480
-/** これ未満の移動はドラッグではなくクリックとして扱う（px） */
-const DRAG_THRESHOLD_PX = 4
-/** 開閉タブの矢印（上に展開するので閉時は上向き） */
-const ARROW_COLLAPSED = "▲"
-const ARROW_EXPANDED = "▼"
-
 /** ブラウザ内蔵読み上げの言語 */
 const SPEECH_LANG = "ja-JP"
 const DEFAULT_RATE = 1
@@ -97,12 +81,6 @@ export class BouyomiConnectorElement extends HTMLElement {
   /** UIパネル要素 */
   #panel: HTMLElement | null = null
 
-  /** ドラッグ中の状態（null なら非ドラッグ） */
-  #drag: { startX: number; startLeft: number; moved: boolean } | null = null
-
-  /** ドラッグ直後のクリックで開閉しないようにするフラグ */
-  #suppressNextClick = false
-
   /** クールダウンタイマーID */
   #cooldownTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -145,8 +123,6 @@ export class BouyomiConnectorElement extends HTMLElement {
 
   disconnectedCallback(): void {
     this.#stopObserver()
-    this.#handleDragEnd()
-    this.#suppressNextClick = false
     this.#panel?.remove()
 
     // タイマーをクリア
@@ -666,64 +642,24 @@ export class BouyomiConnectorElement extends HTMLElement {
       header,
       controls,
     ])
-    const content = this.#el(
-      "div",
-      {
-        className: "bouyomi-content",
-        style: "width:100%;box-sizing:border-box",
-      },
-      [body],
-    )
+    const content = this.#el("div", { className: "bouyomi-content" }, [body])
 
-    // 開閉アニメーション用の入れ物（閉じた状態で開始）
-    // max-height を 0→上限 に遷移させ、下端アンカーなので下から迫り上がって見える
-    const drawer = this.#el(
-      "div",
-      {
-        "data-bouyomi-drawer": "",
-        style: `overflow:hidden;max-height:0px;visibility:hidden;transition:max-height ${PANEL_ANIM_MS}ms ease,visibility ${PANEL_ANIM_MS}ms`,
-      },
-      [content],
-    )
-
-    // タブ（クリックで開閉、ドラッグで左右移動）
-    const tabArrow = this.#el("span", { className: "tab-arrow" }, [
-      ARROW_COLLAPSED,
+    // タブ
+    const tabArrow = this.#el("span", { className: "tab-arrow" }, ["\u25B6"])
+    const tab = this.#el("div", { className: "bouyomi-tab" }, [
+      tabArrow,
+      "読み上げ",
     ])
-    const tab = this.#el(
-      "div",
-      {
-        className: "bouyomi-tab",
-        style: `width:100%;height:${TAB_HEIGHT_PX}px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:4px;writing-mode:horizontal-tb;cursor:pointer;user-select:none;touch-action:none`,
-      },
-      [tabArrow, "読み上げ"],
-    )
 
-    // コンテナ（下端固定・右端から32px・展開時と同じ横幅。drawer→tab の順で上に展開する）
-    this.#panel = this.#el(
-      "div",
-      {
-        className: "bouyomi-fixed collapsed",
-        style: `position:fixed;top:auto;bottom:0;left:auto;right:${PANEL_RIGHT_MARGIN_PX}px;width:${PANEL_WIDTH_PX}px;display:flex;flex-direction:column;z-index:9999`,
-      },
-      [drawer, tab],
-    )
+    // コンテナ
+    this.#panel = this.#el("div", { className: "bouyomi-fixed collapsed" }, [
+      tab,
+      content,
+    ])
 
-    // タブクリックで開閉（ドラッグ直後のクリックは無視）
+    // タブクリックで開閉
     tab.addEventListener("click", () => {
-      if (this.#suppressNextClick) {
-        this.#suppressNextClick = false
-        return
-      }
-      const collapsed = this.#panel?.classList.toggle("collapsed") ?? true
-      drawer.style.maxHeight = collapsed ? "0px" : `${DRAWER_MAX_HEIGHT_PX}px`
-      drawer.style.visibility = collapsed ? "hidden" : "visible"
-      tabArrow.textContent = collapsed ? ARROW_COLLAPSED : ARROW_EXPANDED
-    })
-
-    // タブのドラッグで左右移動
-    tab.addEventListener("pointerdown", (event) => {
-      this.#startDrag(event)
+      this.#panel?.classList.toggle("collapsed")
     })
 
     // トグルボタン
@@ -808,44 +744,5 @@ export class BouyomiConnectorElement extends HTMLElement {
     if (bouyomiBox) {
       bouyomiBox.style.display = isBrowser ? "none" : "block"
     }
-  }
-
-  /** タブのドラッグを開始 */
-  #startDrag(event: PointerEvent): void {
-    if (!this.#panel) return
-    this.#drag = {
-      startX: event.clientX,
-      startLeft: this.#panel.getBoundingClientRect().left,
-      moved: false,
-    }
-    window.addEventListener("pointermove", this.#handleDragMove)
-    window.addEventListener("pointerup", this.#handleDragEnd)
-  }
-
-  /** ドラッグ中: パネルを左右に追従させる（上下は動かさない） */
-  #handleDragMove = (event: PointerEvent): void => {
-    const drag = this.#drag
-    const panel = this.#panel
-    if (!drag || !panel) return
-
-    const dx = event.clientX - drag.startX
-    // しきい値未満はクリック扱いのまま
-    if (!drag.moved && Math.abs(dx) < DRAG_THRESHOLD_PX) return
-    drag.moved = true
-
-    const maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth)
-    const left = Math.min(maxLeft, Math.max(0, drag.startLeft + dx))
-    panel.style.left = `${left}px`
-    panel.style.right = "auto"
-  }
-
-  /** ドラッグ終了: 移動していたら直後のクリックによる開閉を抑止 */
-  #handleDragEnd = (): void => {
-    if (this.#drag?.moved) {
-      this.#suppressNextClick = true
-    }
-    this.#drag = null
-    window.removeEventListener("pointermove", this.#handleDragMove)
-    window.removeEventListener("pointerup", this.#handleDragEnd)
   }
 }
