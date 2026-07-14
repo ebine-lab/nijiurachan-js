@@ -334,12 +334,17 @@ export class BouyomiConnectorElement extends HTMLElement {
     }, QUEUE_INTERVAL_MS)
   }
 
-  /** ポート番号として有効なら整数化して返す。無効なら null */
+  /** ポート番号として有効ならそのまま返す。小数を含む無効値は null */
   #normalizePort(value: unknown): number | null {
-    if (typeof value !== "number" || !Number.isFinite(value)) return null
-    const port = Math.trunc(value)
-    if (port < PORT_MIN || port > PORT_MAX) return null
-    return port
+    if (
+      typeof value !== "number" ||
+      !Number.isInteger(value) ||
+      value < PORT_MIN ||
+      value > PORT_MAX
+    ) {
+      return null
+    }
+    return value
   }
 
   /** 旧設定の endpoint(URL文字列) からポート番号を取り出す（後方互換） */
@@ -347,7 +352,14 @@ export class BouyomiConnectorElement extends HTMLElement {
     if (!endpoint) return null
     try {
       const url = new URL(endpoint)
-      return url.port ? this.#normalizePort(Number(url.port)) : null
+      // ポート省略時はHTTPの既定ポートを実効ポートとして引き継ぐ
+      const port =
+        url.port !== ""
+          ? Number(url.port)
+          : url.protocol === "http:"
+            ? 80
+            : null
+      return this.#normalizePort(port)
     } catch {
       return null
     }

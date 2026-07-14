@@ -209,6 +209,34 @@ describe("bouyomi-connector 読み上げ方式", () => {
     expect(calledUrl).toContain("localhost:50080/Talk")
   })
 
+  test("小数の port 設定は切り捨てず無効値としてデフォルトに戻す", async () => {
+    await mountInitialized({
+      alwaysEnabled: true,
+      mode: "bouyomi",
+      port: 50123.9,
+    })
+
+    addReply("r1", "小数ポート")
+    await flushMicrotasks()
+
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "")
+    expect(calledUrl).toContain("localhost:50080/Talk")
+  })
+
+  test("ポート省略の旧 endpoint はHTTPの既定ポート80を引き継ぐ", async () => {
+    await mountInitialized({
+      alwaysEnabled: true,
+      mode: "bouyomi",
+      endpoint: "http://localhost/Talk",
+    })
+
+    addReply("r1", "既定ポート")
+    await flushMicrotasks()
+
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "")
+    expect(calledUrl).toContain("localhost:80/Talk")
+  })
+
   test("ポート番号入力を変更すると送信先と保存値に反映される", async () => {
     await mountInitialized({
       alwaysEnabled: true,
