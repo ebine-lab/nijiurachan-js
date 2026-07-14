@@ -166,6 +166,135 @@ describe("bouyomi-connector 読み上げ方式", () => {
     expect(speakSpy).not.toHaveBeenCalled()
   })
 
+  test("port 設定を指定すると送信先ポートに反映される", async () => {
+    await mountInitialized({
+      alwaysEnabled: true,
+      mode: "bouyomi",
+      port: 50123,
+    })
+
+    addReply("r1", "ポート指定")
+    await flushMicrotasks()
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "")
+    expect(calledUrl).toContain("localhost:50123/Talk")
+  })
+
+  test("旧設定の endpoint からポート番号を引き継ぐ(後方互換)", async () => {
+    await mountInitialized({
+      alwaysEnabled: true,
+      mode: "bouyomi",
+      endpoint: "http://localhost:51000/Talk",
+    })
+
+    addReply("r1", "旧設定")
+    await flushMicrotasks()
+
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "")
+    expect(calledUrl).toContain("localhost:51000/Talk")
+  })
+
+  test("無効な port 設定はデフォルトポートにフォールバックする", async () => {
+    await mountInitialized({
+      alwaysEnabled: true,
+      mode: "bouyomi",
+      port: 99999,
+    })
+
+    addReply("r1", "無効ポート")
+    await flushMicrotasks()
+
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "")
+    expect(calledUrl).toContain("localhost:50080/Talk")
+  })
+
+  test("小数の port 設定は切り捨てず無効値としてデフォルトに戻す", async () => {
+    await mountInitialized({
+      alwaysEnabled: true,
+      mode: "bouyomi",
+      port: 50123.9,
+    })
+
+    addReply("r1", "小数ポート")
+    await flushMicrotasks()
+
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "")
+    expect(calledUrl).toContain("localhost:50080/Talk")
+  })
+
+  test("ポート省略の旧 endpoint はHTTPの既定ポート80を引き継ぐ", async () => {
+    await mountInitialized({
+      alwaysEnabled: true,
+      mode: "bouyomi",
+      endpoint: "http://localhost/Talk",
+    })
+
+    addReply("r1", "既定ポート")
+    await flushMicrotasks()
+
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "")
+    expect(calledUrl).toContain("localhost:80/Talk")
+  })
+
+  test("ポート番号入力を変更すると送信先と保存値に反映される", async () => {
+    await mountInitialized({
+      alwaysEnabled: true,
+      mode: "bouyomi",
+    })
+
+    const input = document.querySelector<HTMLInputElement>(
+      "[data-bouyomi-port]",
+    )
+    if (!input) throw new Error("port input missing")
+    expect(input.value).toBe("50080")
+
+    input.value = "50500"
+    input.dispatchEvent(new Event("change"))
+
+    addReply("r1", "変更後")
+    await flushMicrotasks()
+
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "")
+    expect(calledUrl).toContain("localhost:50500/Talk")
+
+    const saved = JSON.parse(
+      localStorage.getItem("bouyomiSettings") ?? "{}",
+    ) as { port?: number }
+    expect(saved.port).toBe(50500)
+  })
+
+  test("リセットボタンでポート番号が初期値に戻る", async () => {
+    await mountInitialized({
+      alwaysEnabled: true,
+      mode: "bouyomi",
+      port: 50123,
+    })
+
+    const input = document.querySelector<HTMLInputElement>(
+      "[data-bouyomi-port]",
+    )
+    const resetBtn = document.querySelector<HTMLButtonElement>(
+      "[data-bouyomi-port-reset]",
+    )
+    if (!input || !resetBtn) throw new Error("port controls missing")
+    expect(input.value).toBe("50123")
+
+    resetBtn.click()
+
+    expect(input.value).toBe("50080")
+    const saved = JSON.parse(
+      localStorage.getItem("bouyomiSettings") ?? "{}",
+    ) as { port?: number }
+    expect(saved.port).toBe(50080)
+
+    // 送信先も初期ポートに戻っている
+    addReply("r1", "リセット後")
+    await flushMicrotasks()
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "")
+    expect(calledUrl).toContain("localhost:50080/Talk")
+  })
+
   test("mode 未指定の既存設定は bouyomi として扱う(後方互換)", async () => {
     await mountInitialized({
       alwaysEnabled: true,

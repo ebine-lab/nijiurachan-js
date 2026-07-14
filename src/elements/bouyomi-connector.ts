@@ -16,8 +16,8 @@ interface BouyomiSettings {
   alwaysEnabled: boolean
   /** 新着時自動スクロール */
   autoScroll: boolean
-  /** 棒読みちゃんHTTPエンドポイント */
-  endpoint: string
+  /** 棒読みちゃんHTTP連携のポート番号 */
+  port: number
   /** 個別ONにしたスレッドID一覧 */
   enabledThreadIds: string[]
   /** 読み上げ方式（bouyomi=棒読みちゃん連携 / browser=ブラウザ内蔵） */
@@ -29,7 +29,9 @@ interface BouyomiSettings {
 }
 
 const STORAGE_KEY = "bouyomiSettings"
-const DEFAULT_ENDPOINT = "http://localhost:50080/Talk"
+const DEFAULT_PORT = 50080
+const PORT_MIN = 1
+const PORT_MAX = 65535
 const INIT_COOLDOWN_MS = 3000
 const QUEUE_INTERVAL_MS = 500
 const MAX_TEXT_LENGTH = 200
@@ -69,7 +71,7 @@ export class BouyomiConnectorElement extends HTMLElement {
   #settings: BouyomiSettings = {
     alwaysEnabled: false,
     autoScroll: false,
-    endpoint: DEFAULT_ENDPOINT,
+    port: DEFAULT_PORT,
     enabledThreadIds: [],
     mode: "bouyomi",
     rate: DEFAULT_RATE,
@@ -144,11 +146,17 @@ export class BouyomiConnectorElement extends HTMLElement {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) {
-        const parsed = JSON.parse(saved) as Partial<BouyomiSettings>
+        // 旧設定は port の代わりに endpoint(URL文字列) を持つ
+        const parsed = JSON.parse(saved) as Partial<BouyomiSettings> & {
+          endpoint?: string
+        }
         this.#settings = {
           alwaysEnabled: parsed.alwaysEnabled ?? false,
           autoScroll: parsed.autoScroll ?? false,
-          endpoint: parsed.endpoint ?? DEFAULT_ENDPOINT,
+          port:
+            this.#normalizePort(parsed.port) ??
+            this.#portFromEndpoint(parsed.endpoint) ??
+            DEFAULT_PORT,
           enabledThreadIds: parsed.enabledThreadIds ?? [],
           // 旧設定（mode 無し）は棒読みちゃん連携として扱う
           mode: parsed.mode === "browser" ? "browser" : "bouyomi",
@@ -326,9 +334,41 @@ export class BouyomiConnectorElement extends HTMLElement {
     }, QUEUE_INTERVAL_MS)
   }
 
+  /** ポート番号として有効ならそのまま返す。小数を含む無効値は null */
+  #normalizePort(value: unknown): number | null {
+    if (
+      typeof value !== "number" ||
+      !Number.isInteger(value) ||
+      value < PORT_MIN ||
+      value > PORT_MAX
+    ) {
+      return null
+    }
+    return value
+  }
+
+  /** 旧設定の endpoint(URL文字列) からポート番号を取り出す（後方互換） */
+  #portFromEndpoint(endpoint: string | undefined): number | null {
+    if (!endpoint) return null
+    try {
+      const url = new URL(endpoint)
+      // ポート省略時はHTTPの既定ポートを実効ポートとして引き継ぐ
+      const port =
+        url.port !== ""
+          ? Number(url.port)
+          : url.protocol === "http:"
+            ? 80
+            : null
+      return this.#normalizePort(port)
+    } catch {
+      return null
+    }
+  }
+
   /** 棒読みちゃんに送信 */
   #sendToBouyomi(text: string): void {
-    const url = `${this.#settings.endpoint}?text=${encodeURIComponent(text)}`
+    const endpoint = `http://localhost:${this.#settings.port}/Talk`
+    const url = `${endpoint}?text=${encodeURIComponent(text)}`
 
     // no-corsモードで送信（レスポンスは取得不可だが送信は成功）
     fetch(url, { mode: "no-cors" }).catch(() => {
@@ -531,6 +571,44 @@ export class BouyomiConnectorElement extends HTMLElement {
       ["読み上げ方法", modeSelect],
     )
 
+    // 棒読みちゃんモードのポート番号入力
+    const portInput = this.#el("input", {
+      type: "number",
+      min: String(PORT_MIN),
+      max: String(PORT_MAX),
+      "data-bouyomi-port": "",
+      style:
+        "flex:1;min-width:0;padding:4px;font-size:12px;box-sizing:border-box",
+    })
+    // ポート番号を初期値に戻すボタン
+    const portResetBtn = this.#el(
+      "button",
+      {
+        type: "button",
+        title: `初期値（${DEFAULT_PORT}）に戻す`,
+        "data-bouyomi-port-reset": "",
+        style: "padding:2px 6px;font-size:12px;cursor:pointer",
+      },
+      ["🔄"],
+    )
+    const portRow = this.#el(
+      "div",
+      { style: "display:flex;gap:4px;margin-top:2px" },
+      [portInput, portResetBtn],
+    )
+    const portLabel = this.#el(
+      "label",
+      { style: "display:block;margin-top:6px;font-size:12px" },
+      ["ポート番号", portRow],
+    )
+
+    // 棒読みちゃんモード専用設定（mode に応じて表示切替）
+    const bouyomiSettings = this.#el(
+      "div",
+      { "data-bouyomi-http-settings": "", style: "margin-top:4px" },
+      [portLabel],
+    )
+
     // ブラウザ内蔵モードの速度スライダー
     const rateInput = this.#el("input", {
       type: "range",
@@ -578,6 +656,7 @@ export class BouyomiConnectorElement extends HTMLElement {
       alwaysLabel,
       autoScrollLabel,
       modeLabel,
+      bouyomiSettings,
       browserSettings,
     ])
 
@@ -637,9 +716,25 @@ export class BouyomiConnectorElement extends HTMLElement {
       this.#settings.mode =
         modeSelect.value === "browser" ? "browser" : "bouyomi"
       this.#saveSettings()
-      this.#updateBrowserSettingsVisibility()
+      this.#updateModeSettingsVisibility()
       // 方式切替時は進行中の読み上げを止める
       this.#cancelSpeech()
+    })
+
+    // ポート番号入力（無効値はデフォルトに戻す）
+    portInput.value = String(this.#settings.port)
+    portInput.addEventListener("change", () => {
+      const port = this.#normalizePort(Number(portInput.value)) ?? DEFAULT_PORT
+      this.#settings.port = port
+      portInput.value = String(port)
+      this.#saveSettings()
+    })
+
+    // ポート番号リセットボタン
+    portResetBtn.addEventListener("click", () => {
+      this.#settings.port = DEFAULT_PORT
+      portInput.value = String(DEFAULT_PORT)
+      this.#saveSettings()
     })
 
     // 速度スライダー
@@ -666,15 +761,23 @@ export class BouyomiConnectorElement extends HTMLElement {
 
     // 初期状態の表示を更新
     this.#updateToggleButton()
-    this.#updateBrowserSettingsVisibility()
+    this.#updateModeSettingsVisibility()
   }
 
-  /** モードに応じてブラウザ内蔵設定（速度/音量）の表示を切り替える */
-  #updateBrowserSettingsVisibility(): void {
-    const box = this.#panel?.querySelector<HTMLElement>(
+  /** モードに応じて各方式専用設定（ポート / 速度・音量）の表示を切り替える */
+  #updateModeSettingsVisibility(): void {
+    const isBrowser = this.#settings.mode === "browser"
+    const browserBox = this.#panel?.querySelector<HTMLElement>(
       "[data-bouyomi-browser-settings]",
     )
-    if (!box) return
-    box.style.display = this.#settings.mode === "browser" ? "block" : "none"
+    if (browserBox) {
+      browserBox.style.display = isBrowser ? "block" : "none"
+    }
+    const bouyomiBox = this.#panel?.querySelector<HTMLElement>(
+      "[data-bouyomi-http-settings]",
+    )
+    if (bouyomiBox) {
+      bouyomiBox.style.display = isBrowser ? "none" : "block"
+    }
   }
 }
