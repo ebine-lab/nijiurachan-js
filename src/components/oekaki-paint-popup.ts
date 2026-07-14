@@ -55,12 +55,16 @@ export function resolvePaintPopup(
   config: OekakiPaintPopupConfig,
   tool: OekakiTool,
 ): ResolvedPaintPopup {
+  // fileTool は setImage() で MIME サフィックス (`${image.type}+${fileTool}`)
+  // として使われ、バックエンド (PostController::parseUpload) が
+  // `image/{png,webp}+oekaki` / `+oekaki98` の 4 種のみ `is_oekaki=true` と
+  // 判定する。Klecks でも "oekaki" を返さないとお絵描きフラグが立たない。
   if (!isPopupConfig(config)) {
     return { popup: config, fileTool: "oekaki" }
   }
 
   if (tool === "klecks" && config.klecks) {
-    return { popup: config.klecks, fileTool: "klecks" }
+    return { popup: config.klecks, fileTool: "oekaki" }
   }
 
   return { popup: config.axnos, fileTool: "oekaki" }
