@@ -70,12 +70,43 @@ export const ANNOUNCE_CSS = `
   line-height: 1.4;
   pointer-events: none;
 }
-.aimg-announce-title {
+.aimg-announce-titles {
+  position: relative;
   flex: 1;
   min-width: 0;
+  height: 1.4em;
+}
+.aimg-announce-title {
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+/* クロスフェード: 旧タイトルは 0〜0.5s でフェードアウト、
+   新タイトルは 0.2s 遅れて 0.5s かけてフェードイン(重なり 0.3s) */
+@keyframes aimg-announce-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes aimg-announce-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.aimg-announce-title.is-leaving {
+  animation: aimg-announce-fade-out 0.5s ease forwards;
+}
+.aimg-announce-title.is-entering {
+  animation: aimg-announce-fade-in 0.5s ease 0.2s backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .aimg-announce-title.is-leaving,
+  .aimg-announce-title.is-entering {
+    animation: none;
+  }
+  .aimg-announce-title.is-leaving {
+    opacity: 0;
+  }
 }
 .aimg-announce-lv-normal { color: var(--aimg-announce-fg-normal); }
 .aimg-announce-lv-important { color: var(--aimg-announce-fg-important); }

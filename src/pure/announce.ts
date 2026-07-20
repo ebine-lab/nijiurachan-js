@@ -100,6 +100,18 @@ export function nextBannerIndex(index: number, length: number): number {
   return (index + 1) % length
 }
 
+/** レベルに応じた表示持続時間の加算値(重要な告知ほど長く見せる) */
+export const LEVEL_EXTRA_DURATION_MS: Record<AnnounceLevel, number> = {
+  normal: 0,
+  important: 1500,
+  emergency: 2500,
+}
+
+/** 現在表示中アイテムの表示持続時間(基準値 + レベル別加算) */
+export function rotateDurationMs(baseMs: number, level: AnnounceLevel): number {
+  return baseMs + LEVEL_EXTRA_DURATION_MS[level]
+}
+
 /** レベルに応じたタイトル前置アイコン */
 export function levelPrefix(level: AnnounceLevel): string {
   if (level === "emergency") return "🚨"

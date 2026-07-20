@@ -162,6 +162,85 @@ describe("AnnounceBannerUI — ローテーション", () => {
   })
 })
 
+describe("AnnounceBannerUI — レベル別持続時間", () => {
+  it("emergency は基準+2.5秒表示してから次へ進む", async () => {
+    vi.useFakeTimers()
+    const banners = [
+      banner({ id: 1, title: "緊急", level: "emergency" }),
+      banner({ id: 2, title: "次の告知" }),
+    ]
+    await act(() => {
+      render(<AnnounceBannerUI {...baseProps({ banners })} />, container)
+    })
+    await act(() => {
+      vi.advanceTimersByTime(7499)
+    })
+    expect(container.textContent).not.toContain("次の告知")
+    await act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(container.textContent).toContain("次の告知")
+  })
+
+  it("important は基準+1.5秒表示してから次へ進む", async () => {
+    vi.useFakeTimers()
+    const banners = [
+      banner({ id: 1, title: "推奨", level: "important" }),
+      banner({ id: 2, title: "次の告知" }),
+    ]
+    await act(() => {
+      render(<AnnounceBannerUI {...baseProps({ banners })} />, container)
+    })
+    await act(() => {
+      vi.advanceTimersByTime(6499)
+    })
+    expect(container.textContent).not.toContain("次の告知")
+    await act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(container.textContent).toContain("次の告知")
+  })
+})
+
+describe("AnnounceBannerUI — クロスフェード", () => {
+  it("スワップ直後は新旧タイトルが共存し、フェード完了後に旧が消える", async () => {
+    vi.useFakeTimers()
+    const banners = [
+      banner({ id: 1, title: "一つ目" }),
+      banner({ id: 2, title: "二つ目" }),
+    ]
+    await act(() => {
+      render(<AnnounceBannerUI {...baseProps({ banners })} />, container)
+    })
+    await act(() => {
+      vi.advanceTimersByTime(5000)
+    })
+    // クロスフェード中: 旧(is-leaving)と新(is-entering)が重なって存在する
+    const leaving = container.querySelector(".aimg-announce-title.is-leaving")
+    const entering = container.querySelector(".aimg-announce-title.is-entering")
+    expect(leaving?.textContent).toBe("一つ目")
+    expect(entering?.textContent).toBe("二つ目")
+    // フェード完了(0.7s)後は旧タイトルが破棄される
+    await act(() => {
+      vi.advanceTimersByTime(700)
+    })
+    expect(
+      container.querySelector(".aimg-announce-title.is-leaving"),
+    ).toBeNull()
+    expect(container.textContent).not.toContain("一つ目")
+  })
+
+  it("初期表示ではフェードインしない(is-entering が付かない)", async () => {
+    vi.useFakeTimers()
+    await act(() => {
+      render(<AnnounceBannerUI {...baseProps({})} />, container)
+    })
+    expect(
+      container.querySelector(".aimg-announce-title.is-entering"),
+    ).toBeNull()
+  })
+})
+
 describe("AnnounceBannerUI — 操作", () => {
   it("✕クリックで onDismiss が呼ばれナビゲーションは抑止される", () => {
     const onDismiss = vi.fn()

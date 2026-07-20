@@ -9,6 +9,7 @@ import {
   nextBannerIndex,
   type PublicAnnouncement,
   parseAnnounceCache,
+  rotateDurationMs,
   serializeAnnounceCache,
   shouldFetchMeta,
   shouldRefetchBanner,
@@ -102,6 +103,18 @@ describe("nextBannerIndex", () => {
   })
   it("length 0 でも 0 を返す(ゼロ除算しない)", () => {
     expect(nextBannerIndex(0, 0)).toBe(0)
+  })
+})
+
+describe("rotateDurationMs", () => {
+  it("normal は基準値のまま", () => {
+    expect(rotateDurationMs(5000, "normal")).toBe(5000)
+  })
+  it("important は +1.5秒", () => {
+    expect(rotateDurationMs(5000, "important")).toBe(6500)
+  })
+  it("emergency は +2.5秒", () => {
+    expect(rotateDurationMs(5000, "emergency")).toBe(7500)
   })
 })
 
