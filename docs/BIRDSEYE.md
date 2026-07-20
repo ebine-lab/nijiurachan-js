@@ -54,6 +54,8 @@ flowchart LR
   - 現在のテスト思想が最も見える領域
 - `src/react/PreactWrapperV1/README.md`
   - React アプリへの橋渡し API リファレンス (`<CustomElementRegion>` / `useEvent` 等)
+- `src/elements/announce-banner.ts`
+  - マウント時キャッシュフェッチ(60秒スロットル)と自己完結スタイル注入の代表例(リポジトリ初の自己スタイル widget)
 
 ## 5. 文書の責務分担
 
