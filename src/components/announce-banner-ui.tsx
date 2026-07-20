@@ -72,6 +72,9 @@ export function AnnounceBannerUI(props: AnnounceBannerUIProps): VNode {
   const [index, setIndex] = useState(0)
   const [prevItem, setPrevItem] = useState<PublicAnnouncement | null>(null)
   const [hovered, setHovered] = useState(false)
+  const [focused, setFocused] = useState(false)
+  // マウスホバーだけでなくキーボードフォーカス中(リンク/✕とも)も停止する
+  const paused = hovered || focused
 
   // 再取得でリストが縮んでも範囲外を描画しないようにクランプ
   const item = banners[banners.length > 0 ? index % banners.length : 0]
@@ -79,8 +82,8 @@ export function AnnounceBannerUI(props: AnnounceBannerUIProps): VNode {
   // 表示中アイテムのレベルに応じた持続時間で次のスワップを1回分だけ予約する
   // (setInterval ではなく setTimeout チェーン)。
   useEffect(() => {
-    // 1件以下・ホバー中・motion 低減設定ではローテーションしない
-    if (banners.length <= 1 || hovered || prefersReducedMotion()) return
+    // 1件以下・ホバー/フォーカス中・motion 低減設定ではローテーションしない
+    if (banners.length <= 1 || paused || prefersReducedMotion()) return
     if (item == null) return
     const timer = setTimeout(
       () => {
@@ -90,7 +93,7 @@ export function AnnounceBannerUI(props: AnnounceBannerUIProps): VNode {
       rotateDurationMs(rotateIntervalMs, item.level),
     )
     return () => clearTimeout(timer)
-  }, [banners, hovered, rotateIntervalMs, item])
+  }, [banners, paused, rotateIntervalMs, item])
 
   // クロスフェード終了後に旧タイトルを破棄する
   useEffect(() => {
@@ -99,43 +102,50 @@ export function AnnounceBannerUI(props: AnnounceBannerUIProps): VNode {
     return () => clearTimeout(timer)
   }, [prevItem])
 
+  // ✕は <a> の中に置けない(インタラクティブ要素のネストは不正)ため、
+  // リンクとボタンをラッパーの兄弟要素として並べる。
+  // ホバー/フォーカスの一時停止ハンドラは各インタラクティブ要素に付ける
+  // (静的なラッパーにハンドラを持たせない)。
+  const pauseHandlers = {
+    onMouseEnter: (): void => setHovered(true),
+    onMouseLeave: (): void => setHovered(false),
+    onFocus: (): void => setFocused(true),
+    onBlur: (): void => setFocused(false),
+  }
   return (
-    <a
-      class="aimg-announce-root"
-      data-theme={theme}
-      href={href}
-      aria-label={item != null ? `お知らせ: ${item.title}` : "お知らせ"}
-      onClick={() => onLinkClick()}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <span class="aimg-announce-icon-wrap">
-        <img
-          class="aimg-announce-icon"
-          src={iconSrc}
-          alt=""
-          width={32}
-          height={32}
-        />
-        {showNewBadge && <span class="aimg-announce-badge">new</span>}
-      </span>
-      <span class="aimg-announce-titles" aria-live="polite">
-        {prevItem != null && titleSpan(prevItem, "leaving")}
-        {item != null && titleSpan(item, prevItem != null ? "entering" : null)}
-      </span>
+    <span class="aimg-announce-root" data-theme={theme}>
+      <a
+        class="aimg-announce-link"
+        href={href}
+        aria-label={item != null ? `お知らせ: ${item.title}` : "お知らせ"}
+        onClick={() => onLinkClick()}
+        {...pauseHandlers}
+      >
+        <span class="aimg-announce-icon-wrap">
+          <img
+            class="aimg-announce-icon"
+            src={iconSrc}
+            alt=""
+            width={32}
+            height={32}
+          />
+          {showNewBadge && <span class="aimg-announce-badge">new</span>}
+        </span>
+        <span class="aimg-announce-titles" aria-live="polite">
+          {prevItem != null && titleSpan(prevItem, "leaving")}
+          {item != null &&
+            titleSpan(item, prevItem != null ? "entering" : null)}
+        </span>
+      </a>
       <button
         type="button"
         class="aimg-announce-close"
         aria-label="お知らせを閉じる"
-        onClick={(e: Event) => {
-          // 外側の <a> への伝播とナビゲーションを止めてから閉じる
-          e.preventDefault()
-          e.stopPropagation()
-          onDismiss()
-        }}
+        onClick={() => onDismiss()}
+        {...pauseHandlers}
       >
         ✕
       </button>
-    </a>
+    </span>
   )
 }

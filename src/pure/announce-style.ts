@@ -28,7 +28,6 @@ export const ANNOUNCE_CSS = `
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
   box-sizing: border-box;
   max-width: 100%;
   /* アイコン32px + 縦4px×2 + 枠1px×2 = 高さ42px(アイコン28px時代と同じ) */
@@ -39,8 +38,16 @@ export const ANNOUNCE_CSS = `
   color: var(--aimg-announce-fg-normal);
   font-size: 14px;
   line-height: 1.4;
-  text-decoration: none;
   overflow: hidden;
+}
+.aimg-announce-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
 }
 .aimg-announce-root[data-theme="dark"] {${DARK_VARS}}
 @media (prefers-color-scheme: dark) {

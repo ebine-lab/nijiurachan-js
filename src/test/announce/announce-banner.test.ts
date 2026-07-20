@@ -255,11 +255,11 @@ describe("AnnounceBannerElement — 未読バッジと既読記録", () => {
   it("リンククリックで seenArticle が記録され、以後バッジ条件が消える", async () => {
     stubFetch()
     const el = await mount()
-    const root = el.querySelector(".aimg-announce-root") as HTMLAnchorElement
+    const link = el.querySelector(".aimg-announce-link") as HTMLAnchorElement
     const ev = new MouseEvent("click", { bubbles: true, cancelable: true })
     // jsdom の実ナビゲーションを避けるためリスナー最後で抑止する
-    root.addEventListener("click", (e) => e.preventDefault())
-    root.dispatchEvent(ev)
+    link.addEventListener("click", (e) => e.preventDefault())
+    link.dispatchEvent(ev)
     expect(storedCache().seenArticle).toBe(META.article)
   })
 

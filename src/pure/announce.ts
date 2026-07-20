@@ -4,18 +4,22 @@
 
 export type AnnounceLevel = "normal" | "important" | "emergency"
 
-/** GET /api/v1/banner の各要素(公開 API の PublicAnnouncement) */
+/**
+ * GET /api/v1/banner の各要素(公開 API の PublicAnnouncement)。
+ * バナー表示に必須なのは id / title / level のみ。それ以外は現行 API では
+ * 常に返るが、将来レスポンス節約で省かれても壊れないよう optional にしている。
+ */
 export interface PublicAnnouncement {
   id: number
   title: string
-  body_md: string
-  body_html: string
   level: AnnounceLevel
-  is_pinned: boolean
-  pinned_order: number | null
-  is_banner: boolean
-  published_at: string | null
-  updated_at: string
+  body_md?: string
+  body_html?: string
+  is_pinned?: boolean
+  pinned_order?: number | null
+  is_banner?: boolean
+  published_at?: string | null
+  updated_at?: string
 }
 
 /** GET /api/v1/meta のレスポンス data */
@@ -128,15 +132,13 @@ function isLevel(v: unknown): v is AnnounceLevel {
   return v === "normal" || v === "important" || v === "emergency"
 }
 
+// 検証も表示に必須な id / title / level のみ。他フィールドは API が省いても
+// (あるいは古いキャッシュに無くても)受け入れる。
 function isPublicAnnouncement(v: unknown): v is PublicAnnouncement {
   if (typeof v !== "object" || v == null) return false
   const o = v as Record<string, unknown>
   return (
-    typeof o.id === "number" &&
-    typeof o.title === "string" &&
-    isLevel(o.level) &&
-    (o.published_at == null || typeof o.published_at === "string") &&
-    typeof o.updated_at === "string"
+    typeof o.id === "number" && typeof o.title === "string" && isLevel(o.level)
   )
 }
 

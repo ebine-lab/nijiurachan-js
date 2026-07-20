@@ -144,16 +144,42 @@ describe("AnnounceBannerUI — ローテーション", () => {
     await act(() => {
       render(<AnnounceBannerUI {...baseProps({ banners })} />, container)
     })
-    const root = container.querySelector(".aimg-announce-root") as HTMLElement
+    const link = container.querySelector(".aimg-announce-link") as HTMLElement
     await act(() => {
-      root.dispatchEvent(new MouseEvent("mouseenter", { bubbles: false }))
+      link.dispatchEvent(new MouseEvent("mouseenter", { bubbles: false }))
     })
     await act(() => {
       vi.advanceTimersByTime(15_000)
     })
     expect(container.textContent).toContain("一つ目")
     await act(() => {
-      root.dispatchEvent(new MouseEvent("mouseleave", { bubbles: false }))
+      link.dispatchEvent(new MouseEvent("mouseleave", { bubbles: false }))
+    })
+    await act(() => {
+      vi.advanceTimersByTime(5000)
+    })
+    expect(container.textContent).toContain("二つ目")
+  })
+
+  it("キーボードフォーカス中もローテーションが止まり、外れると再開する", async () => {
+    vi.useFakeTimers()
+    const banners = [
+      banner({ id: 1, title: "一つ目" }),
+      banner({ id: 2, title: "二つ目" }),
+    ]
+    await act(() => {
+      render(<AnnounceBannerUI {...baseProps({ banners })} />, container)
+    })
+    const link = container.querySelector(".aimg-announce-link") as HTMLElement
+    await act(() => {
+      link.dispatchEvent(new FocusEvent("focus"))
+    })
+    await act(() => {
+      vi.advanceTimersByTime(15_000)
+    })
+    expect(container.textContent).toContain("一つ目")
+    await act(() => {
+      link.dispatchEvent(new FocusEvent("blur"))
     })
     await act(() => {
       vi.advanceTimersByTime(5000)
@@ -242,32 +268,34 @@ describe("AnnounceBannerUI — クロスフェード", () => {
 })
 
 describe("AnnounceBannerUI — 操作", () => {
-  it("✕クリックで onDismiss が呼ばれナビゲーションは抑止される", () => {
+  it("✕クリックで onDismiss が呼ばれ、リンクのクリック扱いにならない", () => {
     const onDismiss = vi.fn()
     const onLinkClick = vi.fn()
     render(
       <AnnounceBannerUI {...baseProps({ onDismiss, onLinkClick })} />,
       container,
     )
+    // ✕は <a> の外(兄弟要素)にある = 不正なネストがない
+    expect(
+      container.querySelector(".aimg-announce-link .aimg-announce-close"),
+    ).toBeNull()
     const close = container.querySelector(
       ".aimg-announce-close",
     ) as HTMLButtonElement
     const ev = new MouseEvent("click", { bubbles: true, cancelable: true })
     close.dispatchEvent(ev)
     expect(onDismiss).toHaveBeenCalledTimes(1)
-    expect(ev.defaultPrevented).toBe(true)
-    // stopPropagation により外側リンクのクリック扱いにならない
     expect(onLinkClick).not.toHaveBeenCalled()
   })
 
-  it("バナー本体クリックで onLinkClick が呼ばれる(遷移は抑止しない)", () => {
+  it("リンククリックで onLinkClick が呼ばれる(遷移は抑止しない)", () => {
     const onLinkClick = vi.fn()
     render(<AnnounceBannerUI {...baseProps({ onLinkClick })} />, container)
-    const root = container.querySelector(
-      ".aimg-announce-root",
+    const link = container.querySelector(
+      ".aimg-announce-link",
     ) as HTMLAnchorElement
     const ev = new MouseEvent("click", { bubbles: true, cancelable: true })
-    root.dispatchEvent(ev)
+    link.dispatchEvent(ev)
     expect(onLinkClick).toHaveBeenCalledTimes(1)
     expect(ev.defaultPrevented).toBe(false)
   })
@@ -295,10 +323,10 @@ describe("AnnounceBannerUI — 操作", () => {
 
   it("href とアイコン src が反映される", () => {
     render(<AnnounceBannerUI {...baseProps({})} />, container)
-    const root = container.querySelector(
-      ".aimg-announce-root",
+    const link = container.querySelector(
+      ".aimg-announce-link",
     ) as HTMLAnchorElement
-    expect(root.href).toBe("https://announce.example/")
+    expect(link.href).toBe("https://announce.example/")
     const icon = container.querySelector(
       ".aimg-announce-icon",
     ) as HTMLImageElement
