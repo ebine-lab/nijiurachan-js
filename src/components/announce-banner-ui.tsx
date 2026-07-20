@@ -114,8 +114,8 @@ export function AnnounceBannerUI(props: AnnounceBannerUIProps): VNode {
           class="aimg-announce-icon"
           src={iconSrc}
           alt=""
-          width={28}
-          height={28}
+          width={32}
+          height={32}
         />
         {showNewBadge && <span class="aimg-announce-badge">new</span>}
       </span>

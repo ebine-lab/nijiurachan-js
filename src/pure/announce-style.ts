@@ -31,7 +31,8 @@ export const ANNOUNCE_CSS = `
   gap: 8px;
   box-sizing: border-box;
   max-width: 100%;
-  padding: 6px 30px 6px 10px;
+  /* アイコン32px + 縦4px×2 + 枠1px×2 = 高さ42px(アイコン28px時代と同じ) */
+  padding: 4px 30px 4px 10px;
   border: 1px solid var(--aimg-announce-border);
   border-radius: 10px;
   background: var(--aimg-announce-bg);
@@ -48,8 +49,8 @@ export const ANNOUNCE_CSS = `
 .aimg-announce-icon-wrap {
   position: relative;
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
 }
 .aimg-announce-icon {
   display: block;
